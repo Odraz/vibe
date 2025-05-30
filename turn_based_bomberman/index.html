@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Blast Tactics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overscroll-behavior: none;
+        }
+        .game-canvas {
+            border: 2px solid #333;
+            touch-action: none;
+        }
+        .command-slot {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin: 2px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .player-controls {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .player-eliminated {
+            opacity: 0.5;
+            background-color: #e0e0e0;
+        }
+        .control-key {
+            display: inline-block;
+            padding: 2px 6px;
+            border: 1px solid #999;
+            border-radius: 3px;
+            background-color: #eee;
+            font-size: 0.9em;
+            margin: 0 2px;
+            min-width: 20px;
+            text-align: center;
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+         .player-color-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .powerup-info {
+            font-size: 0.8em;
+            color: #555;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="game-setup" class="bg-white p-8 rounded-lg shadow-xl text-center">
+        <h1 class="text-4xl font-bold mb-6 text-indigo-600">Bot Blast Tactics</h1>
+        <div class="mb-4">
+            <label for="player-count" class="text-lg mr-2">Number of Players (2-4):</label>
+            <select id="player-count" class="p-2 border rounded-md text-lg">
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+            </select>
+        </div>
+        <div class="mb-6">
+            <label for="programming-timer" class="text-lg mr-2">Programming Time (seconds):</label>
+            <select id="programming-timer" class="p-2 border rounded-md text-lg">
+                <option value="15" selected>15</option>
+                <option value="30">30</option>
+                <option value="45">45</option>
+                <option value="60">60</option>
+            </select>
+        </div>
+        <button id="start-game-button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-md transition-transform transform hover:scale-105">
+            Start Game
+        </button>
+        <div class="mt-8 p-4 border border-gray-300 rounded-lg bg-gray-50">
+            <h3 class="text-xl font-semibold mb-3 text-gray-700">How to Play:</h3>
+            <p class="text-left text-gray-600 leading-relaxed">
+                1.  <strong>Program Phase:</strong> Each player secretly inputs 6 commands for their bot (⬆️ ⬇️ ⬅️ ➡️ 💣).
+                <br>2.  Use your assigned keys. Press your 'Confirm' key when ready. 'Erase' to un-confirm or clear last step. A timer limits this phase.
+                <br>3.  <strong>Execution Phase:</strong> All bots execute their 6 commands one by one, simultaneously.
+                <br>4.  💣 Bombs explode after 5 steps (the placement step is step 1). Explosions are cross-shaped.
+                <br>5.  💥 Destroy 🪨 rocks to find power-ups (🔴 Fire Up, ⚫ Bomb Up) and eliminate other bots!
+                <br>6.  Be the last bot standing to win!
+            </p>
+        </div>
+    </div>
+
+    <div id="game-container" class="hidden w-full max-w-7xl">
+        <div class="flex flex-col lg:flex-row gap-4">
+            <div class="flex-grow flex flex-col items-center">
+                <div id="game-info" class="mb-2 text-center w-full bg-white p-3 rounded-lg shadow">
+                    <span id="turn-info" class="text-xl font-semibold text-indigo-700 mr-4">Turn: 1</span>
+                    <span id="step-info" class="text-xl font-semibold text-purple-700 mr-4">Phase: Programming</span>
+                    <span id="timer-display" class="text-xl font-semibold text-red-600">Time: 30</span>
+                </div>
+                <canvas id="gameCanvas" class="game-canvas rounded-lg shadow-md"></canvas>
+                 <div id="execution-message-area" class="h-8 mt-2 text-center text-lg font-medium text-blue-600"></div>
+            </div>
+
+            <div id="players-controls-area" class="w-full lg:w-96 bg-white p-4 rounded-lg shadow">
+                <h2 class="text-2xl font-bold mb-3 text-center text-gray-800">Player Commands</h2>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-over-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="game-over-message" class="text-3xl font-bold mb-6">Game Over!</h2>
+            <button id="play-again-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg text-xl mr-4 shadow-md transition-transform transform hover:scale-105">Play Again</button>
+            <button id="main-menu-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg text-xl shadow-md transition-transform transform hover:scale-105">Main Menu</button>
+        </div>
+    </div>
+
+    <script>
+        // Game Constants and Configuration
+        const GRID_SIZE = 17;
+        const TILE_SIZE = Math.max(15, Math.floor(Math.min(window.innerWidth * 0.9 / GRID_SIZE, (window.innerHeight * 0.6) / GRID_SIZE, 35)));
+        const CANVAS_WIDTH = GRID_SIZE * TILE_SIZE;
+        const CANVAS_HEIGHT = GRID_SIZE * TILE_SIZE;
+
+        const TILE_EMPTY = '🟩';
+        const TILE_WALL = '🧱'; // <<< FIXED THE TYPO HERE
+        const TILE_ROCK = '🪨';
+        const BOMB_SPRITE = '💣';
+        const EXPLOSION_SPRITE = '💥';
+
+        // Power-up Constants
+        const POWERUP_FIRE_UP = '🔴';
+        const POWERUP_BOMB_UP = '⚫';
+        const POWERUP_TYPES = {
+            FIRE_UP: 'FIRE_UP',
+            BOMB_UP: 'BOMB_UP'
+        };
+        const POWERUP_SPRITES = {
+            [POWERUP_TYPES.FIRE_UP]: POWERUP_FIRE_UP,
+            [POWERUP_TYPES.BOMB_UP]: POWERUP_BOMB_UP
+        };
+        const NUM_POWERUPS_TO_PLACE = 30; // As per GDD
+        const MAX_BOMB_CAPACITY = 10; // As per GDD
+        const MAX_BLAST_RADIUS = 10; // As per GDD (max player.blastRadius value)
+        const BASE_BLAST_RADIUS = 1; // Initial blast radius (center + 1 tile each direction)
+
+        const PLAYER_EMOJIS = ['👻', '👽', '👾', '🤖'];
+        const PLAYER_COLORS = ['#4299e1', '#f56565', '#48bb78', '#ecc94b'];
+
+        const DEFAULT_PROGRAMMING_TIME = 30;
+        const MAX_COMMANDS = 6;
+        const BOMB_FUSE_STEPS = 5;
+
+        const GAME_STATE = {
+            SETUP: 'SETUP',
+            PROGRAMMING: 'PROGRAMMING',
+            EXECUTING: 'EXECUTING',
+            GAME_OVER: 'GAME_OVER'
+        };
+
+        // Game Variables
+        let canvas, ctx;
+        let grid = [];
+        let players = [];
+        let bombs = [];
+        let explosions = [];
+        let powerUpsOnMap = []; // Stores {type, sprite, x, y, justRevealed}
+        let hiddenPowerUps = {}; // Stores power-ups under rocks: key `${c},${r}` -> type
+
+        let currentGameState = GAME_STATE.SETUP;
+        let currentProgramStep = 0;
+        let currentRound = 1;
+        let programmingTimer = DEFAULT_PROGRAMMING_TIME;
+        let programmingInterval;
+        let executionStepTimeout;
+        let numPlayers = 2; // Default, will be updated
+        let configuredProgrammingTime = DEFAULT_PROGRAMMING_TIME;
+        let uniqueBombId = 0;
+
+        // DOM Elements
+        const gameSetupDiv = document.getElementById('game-setup');
+        const gameContainerDiv = document.getElementById('game-container');
+        const playerCountSelect = document.getElementById('player-count');
+        const programmingTimerSelect = document.getElementById('programming-timer');
+        const startGameButton = document.getElementById('start-game-button');
+        const turnInfoDisplay = document.getElementById('turn-info');
+        const stepInfoDisplay = document.getElementById('step-info');
+        const timerDisplay = document.getElementById('timer-display');
+        const playersControlsArea = document.getElementById('players-controls-area');
+        const gameOverModal = document.getElementById('game-over-modal');
+        const gameOverMessage = document.getElementById('game-over-message');
+        const playAgainButton = document.getElementById('play-again-button');
+        const mainMenuButton = document.getElementById('main-menu-button');
+        const executionMessageArea = document.getElementById('execution-message-area');
+
+        const gameArenaMap = [
+            "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱",
+            "🧱🟩🟩🪨🟩🟩🟩🟩🟩🟩🟩🟩🟩🪨🟩🟩🧱",
+            "🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱",
+            "🧱🪨🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🪨🧱",
+            "🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱",
+            "🧱🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🧱",
+            "🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱",
+            "🧱🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🧱",
+            "🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱",
+            "🧱🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🧱",
+            "🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱",
+            "🧱🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🧱",
+            "🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱",
+            "🧱🪨🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🟩🪨🧱",
+            "🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱🟩🧱",
+            "🧱🟩🟩🪨🟩🟩🟩🟩🟩🟩🟩🟩🟩🪨🟩🟩🧱",
+            "🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱"
+        ];
+
+        const playerStartPositions = [
+            { x: 1, y: 1 }, { x: 15, y: 1 }, { x: 1, y: 15 }, { x: 15, y: 15 }
+        ];
+
+        const playerControls = [
+            { name: 'Player 1', up: 'w', left: 'a', down: 's', right: 'd', bomb: 'f', eraseKey: 'q', confirmKey: 'e' },
+            { name: 'Player 2', up: 'arrowup', left: 'arrowleft', down: 'arrowdown', right: 'arrowright', bomb: 'shift', eraseKey: 'backspace', confirmKey: 'enter' },
+            { name: 'Player 3', up: 'i', left: 'j', down: 'k', right: 'l', bomb: 'h', eraseKey: 'o', confirmKey: 'u' },
+            { name: 'Player 4', up: 'g', left: 'v', down: 'b', right: 'n', bomb: 'm', eraseKey: 'c', confirmKey: 't' }
+        ];
+
+        function initGame() {
+            // console.log("DEBUG: initGame called");
+            canvas = document.getElementById('gameCanvas');
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT;
+            ctx = canvas.getContext('2d');
+            ctx.font = `${TILE_SIZE * 0.7}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            numPlayers = parseInt(playerCountSelect.value);
+            configuredProgrammingTime = parseInt(programmingTimerSelect.value);
+
+            currentRound = 1;
+            resetGameVariables();
+            createPlayerControlsUI();
+            changeGameState(GAME_STATE.PROGRAMMING);
+        }
+
+        function resetGameVariables() {
+            // console.log("DEBUG: resetGameVariables called");
+            let newGrid = [];
+            const rockProbability = 0.70;
+            const originalMapCharArrays = gameArenaMap.map(rowString => Array.from(rowString));
+
+            const sacredZones = [
+                {x:1,y:1,tile:TILE_EMPTY}, {x:2,y:1,tile:TILE_EMPTY}, {x:1,y:2,tile:TILE_EMPTY},
+                {x:3,y:1,tile:TILE_ROCK},  {x:1,y:3,tile:TILE_ROCK},
+                {x:15,y:1,tile:TILE_EMPTY}, {x:14,y:1,tile:TILE_EMPTY}, {x:15,y:2,tile:TILE_EMPTY},
+                {x:13,y:1,tile:TILE_ROCK},  {x:15,y:3,tile:TILE_ROCK},
+                {x:1,y:15,tile:TILE_EMPTY}, {x:2,y:15,tile:TILE_EMPTY}, {x:1,y:14,tile:TILE_EMPTY},
+                {x:3,y:15,tile:TILE_ROCK},  {x:1,y:13,tile:TILE_ROCK},
+                {x:15,y:15,tile:TILE_EMPTY}, {x:14,y:15,tile:TILE_EMPTY}, {x:15,y:14,tile:TILE_EMPTY},
+                {x:13,y:15,tile:TILE_ROCK},  {x:15,y:13,tile:TILE_ROCK}
+            ];
+
+            const sacredZoneLookup = {};
+            sacredZones.forEach(cell => {
+                sacredZoneLookup[`${cell.x},${cell.y}`] = cell.tile;
+            });
+
+            let potentialRockLocations = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                newGrid[r] = [];
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const key = `${c},${r}`;
+                    const originalChar = originalMapCharArrays[r][c];
+
+                    if (originalChar === TILE_WALL) { // Uses the corrected TILE_WALL
+                        newGrid[r][c] = TILE_WALL;
+                    } else if (sacredZoneLookup[key]) {
+                        newGrid[r][c] = sacredZoneLookup[key];
+                    } else {
+                        if (Math.random() < rockProbability) {
+                            newGrid[r][c] = TILE_ROCK;
+                            potentialRockLocations.push({x: c, y: r});
+                        } else {
+                            newGrid[r][c] = TILE_EMPTY;
+                        }
+                    }
+                }
+            }
+            grid = newGrid;
+
+            hiddenPowerUps = {};
+            powerUpsOnMap = [];
+            potentialRockLocations.sort(() => 0.5 - Math.random());
+            const powerUpTypesToDistribute = [];
+            for(let i=0; i < NUM_POWERUPS_TO_PLACE / 2; i++) {
+                powerUpTypesToDistribute.push(POWERUP_TYPES.FIRE_UP);
+                powerUpTypesToDistribute.push(POWERUP_TYPES.BOMB_UP);
+            }
+            powerUpTypesToDistribute.sort(() => 0.5 - Math.random());
+
+            for (let i = 0; i < Math.min(NUM_POWERUPS_TO_PLACE, potentialRockLocations.length); i++) {
+                const loc = potentialRockLocations[i];
+                if (grid[loc.y][loc.x] === TILE_ROCK) {
+                    const powerUpType = powerUpTypesToDistribute[i % powerUpTypesToDistribute.length];
+                    hiddenPowerUps[`${loc.x},${loc.y}`] = powerUpType;
+                }
+            }
+
+            players = [];
+            for (let i = 0; i < numPlayers; i++) {
+                players.push({
+                    id: i,
+                    name: playerControls[i].name,
+                    emoji: PLAYER_EMOJIS[i],
+                    color: PLAYER_COLORS[i],
+                    x: playerStartPositions[i].x,
+                    y: playerStartPositions[i].y,
+                    alive: true,
+                    commands: Array(MAX_COMMANDS).fill(''),
+                    currentCommandIndex: 0,
+                    ready: false,
+                    bombCapacity: 1,
+                    blastRadius: BASE_BLAST_RADIUS
+                });
+            }
+            bombs = [];
+            explosions = [];
+            uniqueBombId = 0;
+            currentProgramStep = 0;
+            if (programmingInterval) clearInterval(programmingInterval);
+            if (executionStepTimeout) clearTimeout(executionStepTimeout);
+            executionMessageArea.textContent = '';
+        }
+
+        function createPlayerControlsUI() {
+            playersControlsArea.innerHTML = '<h2 class="text-2xl font-bold mb-3 text-center text-gray-800">Player Commands</h2>';
+            for (let i = 0; i < numPlayers; i++) {
+                const p = players[i];
+                const controls = playerControls[i];
+                const playerDiv = document.createElement('div');
+                playerDiv.id = `player-control-${i}`;
+                playerDiv.classList.add('player-controls', 'mb-3', 'rounded-lg', 'p-4');
+                 if (p.alive && p.ready) {
+                    playerDiv.classList.add('border-green-500');
+                } else if (p.alive) {
+                    playerDiv.classList.add('border-blue-500');
+                } else {
+                    playerDiv.classList.add('player-eliminated', 'border-gray-400');
+                }
+
+                let controlsHtml = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-lg font-semibold">
+                             <span class="player-color-indicator" style="background-color: ${p.color};"></span>
+                            ${p.name} (${p.emoji})
+                        </h3>
+                        <span id="player-status-${i}" class="text-sm font-medium ${p.alive ? (p.ready ? 'text-green-700 font-bold' : 'text-blue-600') : 'text-red-600'}">
+                            ${p.alive ? (p.ready ? 'Ready!' : 'Programming...') : 'Eliminated'}
+                        </span>
+                    </div>
+                    <div class="flex justify-center mb-2">`;
+                for (let j = 0; j < MAX_COMMANDS; j++) {
+                    controlsHtml += `<div id="cmd-slot-${i}-${j}" class="command-slot"></div>`;
+                }
+                controlsHtml += `</div>
+                    <div class="text-xs text-gray-600 mb-1 text-center">
+                        Controls:
+                        <span class="control-key">${controls.up.toUpperCase()}</span> (Up)
+                        <span class="control-key">${controls.left.toUpperCase()}</span> (Left)
+                        <span class="control-key">${controls.down.toUpperCase()}</span> (Down)
+                        <span class="control-key">${controls.right.toUpperCase()}</span> (Right)
+                        <br>
+                        <span class="control-key">${controls.bomb.toUpperCase()}</span> (Bomb)
+                        <span class="control-key">${controls.eraseKey.toUpperCase()}</span> (Erase)
+                        <span class="control-key">${controls.confirmKey.toUpperCase()}</span> (Confirm)
+                    </div>
+                    <div id="player-powerups-${i}" class="powerup-info text-center">
+                        Bombs: ${p.bombCapacity}/${MAX_BOMB_CAPACITY} | Fire: +${p.blastRadius - BASE_BLAST_RADIUS}
+                    </div>`;
+                playerDiv.innerHTML = controlsHtml;
+                playersControlsArea.appendChild(playerDiv);
+            }
+        }
+
+        function updatePlayerControlsUI(playerId) {
+            const p = players[playerId];
+            if (!p) return;
+
+            for (let j = 0; j < MAX_COMMANDS; j++) {
+                const slot = document.getElementById(`cmd-slot-${playerId}-${j}`);
+                if (slot) slot.textContent = p.commands[j];
+            }
+
+            const playerStatus = document.getElementById(`player-status-${playerId}`);
+            if (playerStatus) {
+                let statusText = 'Eliminated';
+                let statusColor = 'text-red-600';
+                if (p.alive) {
+                    statusText = p.ready ? 'Ready!' : 'Programming...';
+                    statusColor = p.ready ? 'text-green-700 font-bold' : 'text-blue-600';
+                }
+                playerStatus.textContent = statusText;
+                playerStatus.className = `text-sm font-medium ${statusColor}`;
+            }
+
+            const playerControlDiv = document.getElementById(`player-control-${playerId}`);
+            if (playerControlDiv) {
+                 playerControlDiv.classList.toggle('player-eliminated', !p.alive);
+                 playerControlDiv.classList.remove('border-blue-500', 'border-green-500', 'border-gray-400');
+                 if (p.alive && p.ready) {
+                    playerControlDiv.classList.add('border-green-500');
+                } else if (p.alive) {
+                    playerControlDiv.classList.add('border-blue-500');
+                } else {
+                    playerControlDiv.classList.add('border-gray-400');
+                }
+            }
+
+            const powerupsDisplay = document.getElementById(`player-powerups-${playerId}`);
+            if (powerupsDisplay) {
+                powerupsDisplay.innerHTML = `Bombs: ${p.bombCapacity}/${MAX_BOMB_CAPACITY} | Fire: +${p.blastRadius - BASE_BLAST_RADIUS}`;
+            }
+        }
+
+
+        function gameLoop() {
+            if (currentGameState !== GAME_STATE.SETUP && currentGameState !== GAME_STATE.GAME_OVER) {
+                draw();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            ctx.font = `${TILE_SIZE * 0.7}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            drawGrid();
+            drawPowerUps();
+            drawBombs();
+            drawExplosions();
+            drawPlayers();
+        }
+
+        function drawGrid() {
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (!grid[r] || c >= grid[r].length) {
+                        ctx.fillStyle = 'orange';
+                        ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        ctx.fillStyle = 'black';
+                        ctx.fillText('ERR', c * TILE_SIZE + TILE_SIZE / 2, r * TILE_SIZE + TILE_SIZE / 2);
+                        continue;
+                    }
+                    const tileChar = grid[r][c];
+                    const x = c * TILE_SIZE;
+                    const y = r * TILE_SIZE;
+
+                    if (tileChar === TILE_EMPTY) {
+                        ctx.fillStyle = '#c6f6d5';
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    } else if (tileChar === TILE_WALL) { // Uses the corrected TILE_WALL
+                        ctx.fillStyle = '#718096';
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.fillText(tileChar, x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+                    } else if (tileChar === TILE_ROCK) {
+                        ctx.fillStyle = '#c6f6d5'; // Rocks should have transparent background
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        ctx.fillText(tileChar, x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+                    } else { // Should not happen with current tiles
+                        ctx.fillStyle = '#FF00FF'; // Magenta for unknown tiles
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                         ctx.fillStyle = 'black';
+                         ctx.fillText(String(tileChar), x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+                    }
+                }
+            }
+        }
+
+        function drawPlayers() {
+            players.forEach(p => {
+                if (p.alive) {
+                    ctx.fillText(p.emoji, p.x * TILE_SIZE + TILE_SIZE / 2, p.y * TILE_SIZE + TILE_SIZE / 2);
+                }
+            });
+        }
+
+        function drawBombs() {
+            bombs.forEach(bomb => {
+                ctx.fillText(BOMB_SPRITE, bomb.x * TILE_SIZE + TILE_SIZE / 2, bomb.y * TILE_SIZE + TILE_SIZE / 2);
+                const originalFont = ctx.font;
+                ctx.fillStyle = 'white';
+                ctx.font = `${TILE_SIZE * 0.3}px Arial`;
+                ctx.fillText(bomb.fuseTimer, bomb.x * TILE_SIZE + TILE_SIZE * 0.75, bomb.y * TILE_SIZE + TILE_SIZE * 0.25);
+                ctx.font = originalFont;
+            });
+        }
+
+        function drawExplosions() {
+            explosions.forEach(exp => {
+                 ctx.fillText(EXPLOSION_SPRITE, exp.x * TILE_SIZE + TILE_SIZE / 2, exp.y * TILE_SIZE + TILE_SIZE / 2);
+            });
+        }
+
+        function drawPowerUps() {
+            powerUpsOnMap.forEach(powerUp => {
+                ctx.fillText(powerUp.sprite, powerUp.x * TILE_SIZE + TILE_SIZE / 2, powerUp.y * TILE_SIZE + TILE_SIZE / 2);
+            });
+        }
+
+
+        function changeGameState(newState) {
+            currentGameState = newState;
+            updateGameInfo();
+
+            if (newState === GAME_STATE.PROGRAMMING) {
+                startProgrammingPhase();
+            } else if (newState === GAME_STATE.EXECUTING) {
+                startExecutionPhase();
+            } else if (newState === GAME_STATE.GAME_OVER) {
+                showGameOverModal();
+            } else if (newState === GAME_STATE.SETUP) {
+                gameSetupDiv.classList.remove('hidden');
+                gameContainerDiv.classList.add('hidden');
+                gameOverModal.classList.add('hidden');
+            }
+        }
+
+        function updateGameInfo() {
+            turnInfoDisplay.textContent = `Round: ${currentRound}`;
+            let phaseText = "Programming";
+            if (currentGameState === GAME_STATE.EXECUTING) {
+                phaseText = `Executing Step: ${currentProgramStep + 1}/${MAX_COMMANDS}`;
+            } else if (currentGameState === GAME_STATE.GAME_OVER) {
+                phaseText = "Game Over";
+            }
+            timerDisplay.textContent = (currentGameState === GAME_STATE.PROGRAMMING) ? `Time: ${programmingTimer}` : "";
+            stepInfoDisplay.textContent = `Phase: ${phaseText}`;
+        }
+
+        function startProgrammingPhase() {
+            players.forEach(p => {
+                p.commands = Array(MAX_COMMANDS).fill('');
+                p.currentCommandIndex = 0;
+                p.ready = false;
+                updatePlayerControlsUI(p.id);
+            });
+
+            programmingTimer = configuredProgrammingTime;
+            updateGameInfo();
+            if (programmingInterval) clearInterval(programmingInterval);
+            programmingInterval = setInterval(() => {
+                programmingTimer--;
+                updateGameInfo();
+                if (programmingTimer <= 0) {
+                    clearInterval(programmingInterval);
+                    players.forEach(p => { if (p.alive && !p.ready) { p.ready = true; updatePlayerControlsUI(p.id);} });
+                    checkAllPlayersReady();
+                }
+            }, 1000);
+        }
+
+        function handlePlayerCommand(playerId, commandOrKey) {
+            if (currentGameState !== GAME_STATE.PROGRAMMING) return;
+            const player = players[playerId];
+            if (!player || !player.alive) return;
+
+            const pControls = playerControls[playerId];
+
+            if (commandOrKey === pControls.eraseKey) {
+                if (player.ready) {
+                    player.ready = false;
+                } else {
+                    if (player.currentCommandIndex > 0) {
+                        player.currentCommandIndex--;
+                        player.commands[player.currentCommandIndex] = '';
+                    }
+                }
+                updatePlayerControlsUI(playerId);
+                return;
+            }
+
+            if (commandOrKey === pControls.confirmKey) {
+                if (!player.ready) {
+                    player.ready = true;
+                    updatePlayerControlsUI(playerId);
+                    checkAllPlayersReady();
+                }
+                return;
+            }
+
+            if (player.ready) return;
+
+            let isActionCommand = ['⬆️', '⬇️', '⬅️', '➡️', '💣'].includes(commandOrKey);
+            if (isActionCommand) {
+                if (player.currentCommandIndex < MAX_COMMANDS) {
+                    player.commands[player.currentCommandIndex] = commandOrKey;
+                    player.currentCommandIndex++;
+                }
+                updatePlayerControlsUI(playerId);
+            }
+        }
+
+
+        function checkAllPlayersReady() {
+            const alivePlayers = players.filter(p => p.alive);
+            if (alivePlayers.length === 0 && numPlayers > 0) {
+                 changeGameState(GAME_STATE.GAME_OVER);
+                 return;
+            }
+            const allReady = alivePlayers.every(p => p.ready);
+            if (allReady && alivePlayers.length > 0) {
+                if (programmingInterval) clearInterval(programmingInterval);
+                changeGameState(GAME_STATE.EXECUTING);
+            }
+        }
+
+        function startExecutionPhase() {
+            currentProgramStep = 0;
+            executionMessageArea.textContent = `Executing Round ${currentRound}...`;
+            executeNextStep();
+        }
+
+        function executeNextStep() {
+            if (currentProgramStep >= MAX_COMMANDS) {
+                endExecutionPhase();
+                return;
+            }
+
+            updateGameInfo();
+            explosions = [];
+
+            let newExplosionsOccurred = processBombTimersAndExplosions();
+
+            resolvePlayerActionsForStep(currentProgramStep);
+
+            draw();
+            if (newExplosionsOccurred) {
+                executionStepTimeout = setTimeout(() => {
+                    explosions = [];
+                    draw();
+                    currentProgramStep++;
+                    executionStepTimeout = setTimeout(executeNextStep, 750);
+                }, 500);
+            } else {
+                 currentProgramStep++;
+                 executionStepTimeout = setTimeout(executeNextStep, 350);
+            }
+        }
+
+        function processBombTimersAndExplosions() {
+            let explosionOccurredThisStep = false;
+            let currentExplosionSet = [];
+            let allAffectedCoords = [];
+
+            powerUpsOnMap.forEach(pup => pup.justRevealed = false);
+
+            bombs.forEach(bomb => bomb.fuseTimer++);
+
+            let initialExplodingBombs = bombs.filter(bomb => bomb.fuseTimer >= BOMB_FUSE_STEPS);
+            currentExplosionSet.push(...initialExplodingBombs);
+
+            let processedBombIdsInChain = new Set();
+
+            while (currentExplosionSet.length > 0) {
+                explosionOccurredThisStep = true;
+                let nextChainBombs = [];
+
+                currentExplosionSet.forEach(bombToExplode => {
+                    if (processedBombIdsInChain.has(bombToExplode.id)) return;
+                    processedBombIdsInChain.add(bombToExplode.id);
+
+                    const owner = players.find(p => p.id === bombToExplode.ownerId);
+                    const currentBlastRadius = owner ? owner.blastRadius : BASE_BLAST_RADIUS;
+
+                    if (!allAffectedCoords.find(ac => ac.x === bombToExplode.x && ac.y === bombToExplode.y)) {
+                        allAffectedCoords.push({x: bombToExplode.x, y: bombToExplode.y});
+                    }
+                    if (!explosions.find(e => e.x === bombToExplode.x && e.y === bombToExplode.y)) {
+                        explosions.push({ x: bombToExplode.x, y: bombToExplode.y, life: 1 });
+                    }
+
+                    const directions = [{x:0, y:-1}, {x:0, y:1}, {x:-1, y:0}, {x:1, y:0}];
+                    for (const dir of directions) {
+                        for (let i = 1; i <= currentBlastRadius; i++) {
+                            const bx = bombToExplode.x + dir.x * i;
+                            const by = bombToExplode.y + dir.y * i;
+
+                            if (bx < 0 || bx >= GRID_SIZE || by < 0 || by >= GRID_SIZE) break;
+                            if (grid[by][bx] === TILE_WALL) break; // Blast stops at walls
+
+                            if (!allAffectedCoords.find(ac => ac.x === bx && ac.y === by)) {
+                                allAffectedCoords.push({x: bx, y: by});
+                            }
+                            if (!explosions.find(e => e.x === bx && e.y === by)) {
+                                explosions.push({ x: bx, y: by, life: 1 });
+                            }
+
+                            if (grid[by][bx] === TILE_ROCK) {
+                                break;
+                            }
+
+                            bombs.forEach(otherBomb => {
+                                if (!processedBombIdsInChain.has(otherBomb.id) && otherBomb.x === bx && otherBomb.y === by) {
+                                    if (!nextChainBombs.find(nb => nb.id === otherBomb.id)) {
+                                        nextChainBombs.push(otherBomb);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+                currentExplosionSet = nextChainBombs;
+            }
+
+            if (explosionOccurredThisStep) {
+                allAffectedCoords.forEach(coord => {
+                    if (grid[coord.y][coord.x] === TILE_ROCK) {
+                        // console.log(`DEBUG: Rock at ${coord.x},${coord.y} destroyed by blast.`);
+                        grid[coord.y][coord.x] = TILE_EMPTY;
+                        const powerUpKey = `${coord.x},${coord.y}`;
+                        if (hiddenPowerUps[powerUpKey]) {
+                            const type = hiddenPowerUps[powerUpKey];
+                            const newPowerUp = { type: type, sprite: POWERUP_SPRITES[type], x: coord.x, y: coord.y, justRevealed: true };
+                            powerUpsOnMap.push(newPowerUp);
+                            delete hiddenPowerUps[powerUpKey];
+                            executionMessageArea.textContent = `${POWERUP_SPRITES[type]} revealed!`;
+                            // console.log(`DEBUG: Revealed ${type} at ${coord.x},${coord.y}. PowerUps on map now:`, JSON.parse(JSON.stringify(powerUpsOnMap)));
+                        }
+                    }
+
+                    players.forEach(p => {
+                        if (p.alive && p.x === coord.x && p.y === coord.y) {
+                            p.alive = false;
+                            updatePlayerControlsUI(p.id);
+                            executionMessageArea.textContent = `${p.emoji} eliminated!`;
+                        }
+                    });
+
+                    powerUpsOnMap = powerUpsOnMap.filter(pup => {
+                        if (pup.x === coord.x && pup.y === coord.y) {
+                            if (pup.justRevealed) {
+                                return true;
+                            }
+                            executionMessageArea.textContent = `${pup.sprite} destroyed by blast!`;
+                            // console.log(`DEBUG: Powerup ${pup.sprite} at ${coord.x},${coord.y} (already on map) destroyed by blast.`);
+                            return false;
+                        }
+                        return true;
+                    });
+                });
+            }
+
+            bombs = bombs.filter(b => !processedBombIdsInChain.has(b.id));
+            return explosionOccurredThisStep;
+        }
+
+
+        function resolvePlayerActionsForStep(stepIndex) {
+            let intendedMoves = [];
+
+            players.forEach(p => {
+                if (!p.alive) return;
+                const command = p.commands[stepIndex];
+                p.actionThisStep = { type: 'stay', player: p, currentX: p.x, currentY: p.y, targetX: p.x, targetY: p.y, isValid: true };
+
+                if (command === '💣') {
+                    p.actionThisStep.type = 'bomb';
+                } else if (['⬆️', '⬇️', '⬅️', '➡️'].includes(command)) {
+                    let dx = 0, dy = 0;
+                    if (command === '⬆️') dy = -1;
+                    else if (command === '⬇️') dy = 1;
+                    else if (command === '⬅️') dx = -1;
+                    else if (command === '➡️') dx = 1;
+
+                    p.actionThisStep.type = 'move';
+                    p.actionThisStep.targetX = p.x + dx;
+                    p.actionThisStep.targetY = p.y + dy;
+                    intendedMoves.push(p.actionThisStep);
+                }
+            });
+
+            players.forEach(p => {
+                if (p.alive && p.actionThisStep.type === 'bomb') {
+                    const existingBombAtLocation = bombs.some(b => b.x === p.x && b.y === p.y);
+                    const currentBombsByPlayer = bombs.filter(b => b.ownerId === p.id).length;
+
+                    if (!existingBombAtLocation && currentBombsByPlayer < p.bombCapacity) {
+                        bombs.push({ id: uniqueBombId++, x: p.x, y: p.y, fuseTimer: 0, ownerId: p.id });
+                    } else {
+                        p.actionThisStep.type = 'stay';
+                    }
+                }
+            });
+
+            intendedMoves.forEach(move => {
+                const targetHasBomb = bombs.some(b => b.x === move.targetX && b.y === move.targetY);
+                if (move.targetX < 0 || move.targetX >= GRID_SIZE || move.targetY < 0 || move.targetY >= GRID_SIZE ||
+                    !grid[move.targetY] || !grid[move.targetY][move.targetX] ||
+                    grid[move.targetY][move.targetX] === TILE_WALL || // Uses corrected TILE_WALL
+                    grid[move.targetY][move.targetX] === TILE_ROCK ||
+                    targetHasBomb) {
+                    move.isValid = false;
+                }
+            });
+
+            let targetCounts = {};
+            intendedMoves.filter(m => m.isValid).forEach(m => {
+                const key = `${m.targetX},${m.targetY}`;
+                targetCounts[key] = (targetCounts[key] || 0) + 1;
+            });
+
+            intendedMoves.forEach(move => {
+                if (move.isValid) {
+                    const key = `${move.targetX},${move.targetY}`;
+                    if (targetCounts[key] > 1) {
+                        move.isValid = false;
+                    }
+                }
+            });
+
+            intendedMoves.forEach(move1 => {
+                if (move1.isValid) {
+                    players.forEach(p2 => {
+                        if (p2.id === move1.player.id || !p2.alive) return;
+                        if (move1.targetX === p2.x && move1.targetY === p2.y) {
+                            const p2Action = p2.actionThisStep;
+                            let p2MovingOutSuccessfully = false;
+                            if (p2Action && p2Action.type === 'move' && p2Action.isValid) {
+                                if (p2Action.targetX !== p2.x || p2Action.targetY !== p2.y) {
+                                     p2MovingOutSuccessfully = true;
+                                }
+                            }
+                            if (!p2MovingOutSuccessfully) {
+                                move1.isValid = false;
+                            }
+                        }
+                    });
+                }
+            });
+
+
+            players.forEach(p => {
+                if (p.alive && p.actionThisStep.type === 'move' && p.actionThisStep.isValid) {
+                    p.x = p.actionThisStep.targetX;
+                    p.y = p.actionThisStep.targetY;
+
+                    const powerUpIndex = powerUpsOnMap.findIndex(pup => pup.x === p.x && pup.y === p.y);
+                    if (powerUpIndex !== -1) {
+                        const collectedPowerUp = powerUpsOnMap[powerUpIndex];
+                        if (collectedPowerUp.type === POWERUP_TYPES.BOMB_UP) {
+                            p.bombCapacity = Math.min(p.bombCapacity + 1, MAX_BOMB_CAPACITY);
+                            executionMessageArea.textContent = `${p.emoji} got Bomb Up!`;
+                        } else if (collectedPowerUp.type === POWERUP_TYPES.FIRE_UP) {
+                            p.blastRadius = Math.min(p.blastRadius + 1, MAX_BLAST_RADIUS);
+                            executionMessageArea.textContent = `${p.emoji} got Fire Up!`;
+                        }
+                        powerUpsOnMap.splice(powerUpIndex, 1);
+                        updatePlayerControlsUI(p.id);
+                    }
+                }
+            });
+        }
+
+
+        function endExecutionPhase() {
+            const alivePlayers = players.filter(p => p.alive);
+            if (alivePlayers.length <= 1) {
+                changeGameState(GAME_STATE.GAME_OVER);
+            } else {
+                currentRound++;
+                changeGameState(GAME_STATE.PROGRAMMING);
+            }
+        }
+
+        function showGameOverModal() {
+            const alivePlayers = players.filter(p => p.alive);
+            if (alivePlayers.length === 1) {
+                gameOverMessage.innerHTML = `${alivePlayers[0].name} (${alivePlayers[0].emoji}) Wins!`;
+            } else {
+                gameOverMessage.textContent = "It's a Tie! No bot stands.";
+            }
+            gameOverModal.classList.remove('hidden');
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (currentGameState !== GAME_STATE.PROGRAMMING) return;
+
+            const key = e.key.toLowerCase();
+
+            for (let i = 0; i < numPlayers; i++) {
+                const pControls = playerControls[i];
+                let command = null;
+                let actionKeyProcessed = false;
+
+                if (e.key === 'Shift' && key === pControls.bomb.toLowerCase()) { command = '💣'; actionKeyProcessed = true; }
+                else if (e.key === 'Backspace' && key === pControls.eraseKey.toLowerCase()) { command = pControls.eraseKey; actionKeyProcessed = true; }
+                else if (e.key === 'Enter' && key === pControls.confirmKey.toLowerCase()) { command = pControls.confirmKey; actionKeyProcessed = true; }
+                else if (key === pControls.up) { command = '⬆️'; actionKeyProcessed = true; }
+                else if (key === pControls.down) { command = '⬇️'; actionKeyProcessed = true; }
+                else if (key === pControls.left) { command = '⬅️'; actionKeyProcessed = true; }
+                else if (key === pControls.right) { command = '➡️'; actionKeyProcessed = true; }
+                else if (key === pControls.bomb) { command = '💣'; actionKeyProcessed = true; }
+                else if (key === pControls.eraseKey) { command = pControls.eraseKey; actionKeyProcessed = true; }
+                else if (key === pControls.confirmKey) { command = pControls.confirmKey; actionKeyProcessed = true; }
+
+                if (actionKeyProcessed) {
+                    e.preventDefault();
+                    handlePlayerCommand(i, command);
+                    break;
+                }
+            }
+        });
+
+        startGameButton.addEventListener('click', () => {
+            gameSetupDiv.classList.add('hidden');
+            gameContainerDiv.classList.remove('hidden');
+            initGame();
+            gameLoop();
+        });
+
+        playAgainButton.addEventListener('click', () => {
+            gameOverModal.classList.add('hidden');
+            currentRound = 1;
+            resetGameVariables();
+            createPlayerControlsUI();
+            changeGameState(GAME_STATE.PROGRAMMING);
+        });
+
+        mainMenuButton.addEventListener('click', () => {
+             changeGameState(GAME_STATE.SETUP);
+        });
+
+        changeGameState(GAME_STATE.SETUP);
+
+    </script>
+</body>
+</html>

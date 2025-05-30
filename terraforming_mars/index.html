@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mars Clicker: The Red Planet Transformer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap');
+
+        :root {
+            --color-background: #0a0f18; /* Deep space blue/black */
+            --color-primary: #00e5ff; /* Cyan */
+            --color-secondary: #ff00ff; /* Magenta */
+            --color-tertiary: #39ff14; /* Neon Green */
+            --color-accent: #ff8c00; /* Orange accent for Mars/warnings */
+            --color-text: #e0e0e0;
+            --color-text-muted: #88889a;
+            --color-border: #007788; /* Darker cyan for borders */
+            --font-primary: 'Orbitron', sans-serif;
+            --font-secondary: 'Share Tech Mono', monospace;
+        }
+
+        body {
+            font-family: var(--font-secondary);
+            background-color: var(--color-background);
+            color: var(--color-text);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 1000px;
+            padding: 15px;
+            display: grid;
+            grid-template-areas:
+                "header header"
+                "metrics mars-visual"
+                "resources resources"
+                "main-controls main-controls"
+                "tabs-area tabs-area"
+                "content-area content-area"
+                "log-area log-area";
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            border: 1px solid var(--color-border);
+            background-color: rgba(16, 24, 39, 0.8); /* Slightly transparent dark blue */
+            box-shadow: 0 0 15px var(--color-primary);
+            border-radius: 10px;
+        }
+
+        @media (max-width: 768px) {
+            #game-container {
+                grid-template-areas:
+                    "header"
+                    "metrics"
+                    "mars-visual"
+                    "resources"
+                    "main-controls"
+                    "tabs-area"
+                    "content-area"
+                    "log-area";
+                grid-template-columns: 1fr;
+                padding: 10px;
+            }
+        }
+
+
+        h1, h2, h3 {
+            font-family: var(--font-primary);
+            color: var(--color-primary);
+            text-shadow: 0 0 5px var(--color-primary);
+        }
+
+        button {
+            background-color: var(--color-secondary);
+            color: var(--color-background);
+            border: 1px solid var(--color-primary);
+            padding: 8px 12px;
+            font-family: var(--font-primary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 5px;
+            box-shadow: 0 0 8px var(--color-secondary);
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: var(--color-primary);
+            box-shadow: 0 0 12px var(--color-primary);
+            color: var(--color-background);
+        }
+        
+        button:disabled {
+            background-color: #555;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+            border-color: #444;
+        }
+
+        .tab-button {
+            background-color: var(--color-border);
+            color: var(--color-text);
+        }
+        .tab-button.active {
+            background-color: var(--color-primary);
+            color: var(--color-background);
+        }
+
+        .section {
+            background-color: rgba(10, 15, 24, 0.7); /* Darker, more transparent */
+            padding: 15px;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            box-shadow: inset 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+        
+        #title-header { grid-area: header; text-align: center; }
+        #metrics-container { grid-area: metrics; }
+        #mars-visual-container { grid-area: mars-visual; display: flex; justify-content: center; align-items: center; }
+        #resource-display { grid-area: resources; }
+        #main-controls { grid-area: main-controls; text-align: center; }
+        #tabs-container { grid-area: tabs-area; display: flex; flex-wrap: wrap; gap: 5px; }
+        #content-container { grid-area: content-area; min-height: 150px; }
+        #log-container { grid-area: log-area; }
+
+        .metric, .resource-item {
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+        .metric-label, .resource-label {
+            color: var(--color-primary);
+            font-weight: bold;
+        }
+        .metric-value, .resource-value {
+            color: var(--color-text);
+        }
+        .metric-goal {
+            color: var(--color-text-muted);
+            font-size: 0.8em;
+        }
+        .progress-bar-container {
+            width: 100%;
+            background-color: #222;
+            border-radius: 3px;
+            height: 10px;
+            margin-top: 3px;
+            border: 1px solid var(--color-border);
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: var(--color-tertiary);
+            border-radius: 2px;
+            transition: width 0.5s ease-in-out;
+        }
+        .goal-indicator {
+            display: inline-block;
+            margin-left: 5px;
+            color: var(--color-tertiary);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.5; transform: scale(1); }
+        }
+
+        #mars-planet {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background-color: #c1440e; /* Initial Mars red */
+            border: 2px solid var(--color-accent);
+            box-shadow: 0 0 20px var(--color-accent), inset 0 0 15px rgba(0,0,0,0.3);
+            transition: background-color 1s ease, box-shadow 1s ease;
+            position: relative;
+            overflow: hidden; /* For internal visual elements */
+        }
+        /* Mars visual states */
+        #mars-planet.thaw-ice-caps::before {
+            content: ''; position: absolute; top: 5%; left: 40%; width: 20%; height: 10%; background: white; border-radius: 50%; opacity: 0.7;
+        }
+        #mars-planet.thaw-ice-caps::after {
+            content: ''; position: absolute; bottom: 5%; left: 40%; width: 20%; height: 10%; background: white; border-radius: 50%; opacity: 0.7;
+        }
+         #mars-planet.thaw-water-glint {
+            background-image: radial-gradient(circle at 30% 70%, #4d82b8 5%, transparent 20%); /* Subtle water glint */
+        }
+        #mars-planet.genesis-oceans {
+            background: linear-gradient(135deg, #c1440e 40%, #3b6a8f 70%); /* Red land, blue water */
+        }
+        #mars-planet.genesis-hazy-blue-sky {
+            box-shadow: 0 0 20px #6ca0c1, inset 0 0 15px rgba(0,0,0,0.3); /* Sky color change */
+        }
+        #mars-planet.pioneer-microbes-speckles {
+             background: repeating-radial-gradient(circle at 50% 50%, #3b6a8f, #3b6a8f 2px, #1e7345 2px, #1e7345 4px, #c1440e 4px, #c1440e 6px);
+             background-size: 20px 20px; /* Control speckle density */
+        }
+        #mars-planet.primitive-flora-patches {
+            background: repeating-conic-gradient(#2e8b57 0% 5%, #c1440e 5% 15%, #3b6a8f 15% 20%);
+        }
+         #mars-planet.blue-planet {
+            background: linear-gradient(135deg, #228B22 40%, #1E90FF 70%); /* Green land, blue water */
+            box-shadow: 0 0 30px #1E90FF;
+        }
+
+
+        #log-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            height: 120px;
+            overflow-y: auto;
+            border: 1px solid var(--color-border);
+            padding: 5px;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+        #log-list li {
+            margin-bottom: 4px;
+            color: var(--color-text-muted);
+            border-bottom: 1px dashed rgba(0, 119, 136, 0.3);
+            padding-bottom: 2px;
+        }
+        #log-list li.event-positive { color: var(--color-tertiary); }
+        #log-list li.event-negative { color: var(--color-accent); }
+        #log-list li.phase-unlock { color: var(--color-primary); font-weight: bold; }
+
+        .unit-item, .research-item, .upgrade-item {
+            border: 1px solid var(--color-border);
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            background-color: rgba(0, 229, 255, 0.05);
+        }
+        .unit-item h3, .research-item h3, .upgrade-item h3 {
+            margin-top: 0;
+            font-size: 1.1em;
+            color: var(--color-primary);
+        }
+        .cost { color: var(--color-accent); font-size: 0.9em; }
+        .owned { color: var(--color-tertiary); font-size: 0.9em; }
+        .description { font-size: 0.85em; color: var(--color-text-muted); margin-bottom: 5px;}
+
+        /* Tooltip */
+        [data-tooltip] {
+            position: relative;
+            cursor: help;
+        }
+        [data-tooltip]::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%; /* Position above the element */
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px;
+            background-color: #333;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8em;
+            white-space: nowrap;
+            z-index: 10;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        [data-tooltip]:hover::before {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <header id="title-header">
+            <h1>Mars Clicker: The Red Planet Transformer</h1>
+        </header>
+
+        <section id="metrics-container" class="section">
+            <h2>Planetary Metrics</h2>
+            <div class="metric">
+                <span class="metric-label">Temperature:</span> <span id="temperature" class="metric-value">-60.00</span>°C 
+                <span class="metric-goal">(Goal: +15°C)</span>
+                <span id="temp-goal-indicator" class="goal-indicator hidden">⇧</span>
+                <div class="progress-bar-container"><div id="temperature-progress" class="progress-bar" style="width: 0%;"></div></div>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Atm. Pressure:</span> <span id="pressure" class="metric-value">6.10</span> mbar
+                <span class="metric-goal">(Goal: 1000 mbar)</span>
+                <div class="progress-bar-container"><div id="pressure-progress" class="progress-bar" style="width: 0%;"></div></div>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Oxygen:</span> <span id="oxygen" class="metric-value">0.00</span>%
+                <span class="metric-goal">(Goal: 21%)</span>
+                <div class="progress-bar-container"><div id="oxygen-progress" class="progress-bar" style="width: 0%;"></div></div>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Liquid Water:</span> <span id="liquidWater" class="metric-value">0.00</span>%
+                <span class="metric-goal">(Goal: Abundant)</span>
+                <div class="progress-bar-container"><div id="liquidWater-progress" class="progress-bar" style="width: 0%;"></div></div>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Biosphere Health:</span> <span id="biosphere" class="metric-value">0.00</span>%
+                <span class="metric-goal">(Goal: Thriving)</span>
+                <div class="progress-bar-container"><div id="biosphere-progress" class="progress-bar" style="width: 0%;"></div></div>
+            </div>
+        </section>
+
+        <section id="mars-visual-container" class="section">
+            <div id="mars-planet" title="Mars - Current State: Cold and Arid">
+                </div>
+        </section>
+        
+        <section id="resource-display" class="section">
+            <h2>Resources</h2>
+            <div class="resource-item"><span class="resource-label">Raw Martian Material (RMM):</span> <span id="rmm" class="resource-value">0</span></div>
+            <div class="resource-item hidden" id="power-resource-display"><span class="resource-label">Power (P):</span> <span id="power" class="resource-value">0</span></div>
+            <div class="resource-item hidden" id="waterIce-resource-display"><span class="resource-label">Water Ice (WI):</span> <span id="waterIce" class="resource-value">0</span></div>
+            <div class="resource-item hidden" id="detoxSoil-resource-display"><span class="resource-label">Detoxified Soil (DS):</span> <span id="detoxSoil" class="resource-value">0</span></div>
+        </section>
+
+        <section id="main-controls" class="section">
+            <button id="activateRegolithHarvester" data-tooltip="Generates 1 RMM per click.">Activate Regolith Harvester</button>
+        </section>
+
+        <section id="tabs-container" class="section">
+            </section>
+
+        <section id="content-container" class="section">
+            <p>Welcome to Mars. Begin by harvesting Regolith.</p>
+            </section>
+
+        <section id="log-container" class="section">
+            <h2>Event Log</h2>
+            <ul id="log-list"></ul>
+        </section>
+    </div>
+
+    <script>
+        // --- GAME STATE ---
+        let gameState = {
+            // Resources
+            rmm: 0,
+            power: 0,
+            waterIce: 0,
+            liquidWaterSurfacePercentage: 0, 
+            detoxifiedSoil: 0,
+
+            // Planetary Metrics
+            temperature: -60,
+            atmosphericPressure: 6.1,
+            oxygen: 0,
+            biosphereHealth: 0,
+
+            // Goals
+            goals: {
+                temperature: 15,
+                atmosphericPressure: 1000,
+                oxygen: 21,
+                liquidWaterSurfacePercentage: 50, 
+                biosphereHealth: 100,
+            },
+            initialValues: { 
+                temperature: -60,
+                atmosphericPressure: 6.1,
+            },
+
+            units: {
+                automatedRovers: { name: "Automated Rovers", count: 0, rmmPerSecond: 0.2, cost: { rmm: 25 }, unlocked: false, tab: "phase1", description: "Auto-generates RMM." },
+                smallSolarArrays: { name: "Small Solar Array", count: 0, powerPerSecond: 0.5, cost: { rmm: 75 }, unlocked: false, tab: "energy", description: "Generates Power." },
+                co2Condensers: { name: "CO2 Condenser", count: 0, pressurePerSecond: 0.005, tempPerSecond: 0.001, powerCostPerSecond: 0.1, cost: { rmm: 150, power: 5 }, unlocked: false, tab: "atmosphere", description: "Slowly increases Atm. Pressure & Temp. using Power." },
+                pfcEmitters: { name: "PFC Emitters", count: 0, tempPerSecond: 0.02, powerCostPerSecond: 0.5, cost: { rmm: 500, power: 50 }, unlocked: false, tab: "phase2", description: "Significantly increases Temperature using Power." },
+                atmosphericThickeners: { name: "Atm. Thickeners", count: 0, pressurePerSecond: 0.02, powerCostPerSecond: 0.2, cost: { rmm: 750, power: 75 }, unlocked: false, tab: "phase2", description: "More efficient pressure increase." },
+                iceMiners: { name: "Ice Miners", count: 0, waterIcePerSecond: 0.2, powerCostPerSecond: 0.3, cost: { rmm: 300, power: 30 }, unlocked: false, tab: "phase2", description: "Mines Water Ice from subsurface deposits." },
+                iceMelters: { name: "Ice Melters", count: 0, liquidWaterPerSecond: 0.01, waterIceCostPerSecond: 0.1, powerCostPerSecond: 0.2, cost: { rmm: 1000, power: 100 }, unlocked: false, tab: "water", description: "Converts Water Ice to Liquid Water." },
+                
+                largeWaterPumps: { name: "Large Water Pumps", count: 0, liquidWaterPerSecond: 0.05, powerCostPerSecond: 1, cost: { rmm: 5000, power: 500 }, unlocked: false, tab: "phase3", description: "Faster water distribution."},
+                geothermalDrills: { name: "Geothermal Drill", count: 0, powerPerSecond: 5, cost: { rmm: 10000, liquidWaterSurfacePercentage: 1 }, unlocked: false, tab: "phase3", description: "High power generation, requires some liquid water."}, 
+                // CHANGED: Added oxygenPerSecond to Regolith Processors
+                regolithProcessors: { name: "Regolith Processor", count: 0, detoxSoilPerSecond: 0.05, oxygenPerSecond: 0.0001, powerCostPerSecond: 0.5, cost: { rmm: 2000, power: 200 }, unlocked: false, tab: "phase3", description: "Processes RMM into Detoxified Soil and releases trace Oxygen."},
+
+                perchlorateBioreactors: { name: "Perchlorate Bioreactor", count: 0, detoxSoilRateBoost: 0.01, oxygenPerSecond: 0.0001, cost: { detoxifiedSoil: 100, liquidWaterSurfacePercentage: 0.5, power: 20 }, unlocked: false, tab: "biosphere", subStage: 4.1, description: "Detoxifies soil rapidly, releases trace oxygen." },
+                cyanobacteriaVats: { name: "Cyanobacteria Vats", count: 0, oxygenPerSecond: 0.0005, biosphereHealthPerSecond: 0.001, cost: { liquidWaterSurfacePercentage: 1, detoxifiedSoil: 50, power: 10 }, unlocked: false, tab: "biosphere", subStage: 4.1, description: "Primary oxygen producers, soil enrichers." },
+                algaeAccelerators: { name: "Algae Accelerators", count: 0, oxygenPerSecond: 0.001, biosphereHealthPerSecond: 0.002, cost: { liquidWaterSurfacePercentage: 2, power: 15 }, unlocked: false, tab: "biosphere", subStage: 4.1, description: "Rapid oxygen/organic matter in water." },
+
+                mossDrones: { name: "Moss Spreading Drones", count: 0, biosphereHealthPerSecond: 0.005, oxygenPerSecond: 0.0002, cost: { detoxifiedSoil: 500, liquidWaterSurfacePercentage: 1, power: 30 }, unlocked: false, tab: "biosphere", subStage: 4.2, description: "Spreads mosses for soil formation/oxygen." },
+                herbSeeders: { name: "Hardy Herb Seeders", count: 0, biosphereHealthPerSecond: 0.01, cost: { detoxifiedSoil: 1000, liquidWaterSurfacePercentage: 2, power: 50 }, unlocked: false, tab: "biosphere", subStage: 4.2, description: "Introduces resilient plants." },
+                
+                phytoplanktonDispensers: { name: "Phytoplankton Dispensers", count:0, biosphereHealthPerSecond: 0.02, cost: { liquidWaterSurfacePercentage: 10, power: 100 }, unlocked: false, tab: "biosphere", subStage: 4.3, description: "Seeds oceans with foundational aquatic life."},
+                earthwormSystems: { name: "Earthworm Systems", count: 0, detoxSoilRateBoost: 0.05, cost: { detoxifiedSoil: 2000, biosphereHealth: 5 }, unlocked: false, tab: "biosphere", subStage: 4.3, description: "Accelerates soil creation."},
+                insectCultivators: { name: "Insect Cultivators", count: 0, biosphereHealthPerSecond: 0.015, cost: { detoxifiedSoil: 3000, liquidWaterSurfacePercentage: 5, biosphereHealth: 10 }, unlocked: false, tab: "biosphere", subStage: 4.3, description: "Introduces pollinator/decomposer insects."},
+
+                fishHatcheries: { name: "Cold-Water Fish Hatcheries", count: 0, biosphereHealthPerSecond: 0.05, cost: { liquidWaterSurfacePercentage: 20, power: 500, biosphereHealth: 15 }, unlocked: false, tab: "biosphere", subStage: 4.4, description: "Introduces fish to oceans."},
+                smallHerbivoreRelease: { name: "Small Herbivore Programs", count: 0, biosphereHealthPerSecond: 0.07, cost: { detoxifiedSoil: 10000, liquidWaterSurfacePercentage: 10, biosphereHealth: 20 }, unlocked: false, tab: "biosphere", subStage: 4.4, description: "Introduces small herbivores."},
+                birdSanctuaries: { name: "Bird Sanctuaries", count: 0, biosphereHealthPerSecond: 0.1, cost: { detoxifiedSoil: 15000, liquidWaterSurfacePercentage: 15, biosphereHealth: 25 }, unlocked: false, tab: "biosphere", subStage: 4.4, description: "Introduces hardy bird species."},
+
+                largeMammalIntroduction: { name: "Large Mammal Programs", count: 0, biosphereHealthPerSecond: 0.2, cost: { detoxifiedSoil: 50000, liquidWaterSurfacePercentage: 25, biosphereHealth: 40 }, unlocked: false, tab: "biosphere", subStage: 5, description: "Introduces larger mammals."},
+                forestationUnits: { name: "Forestation Units", count: 0, biosphereHealthPerSecond: 0.15, oxygenPerSecond: 0.005, cost: { detoxifiedSoil: 30000, liquidWaterSurfacePercentage: 20, power: 1000, biosphereHealth: 35 }, unlocked: false, tab: "biosphere", subStage: 5, description: "Automated tree-planting systems."}
+            },
+            upgrades: {
+                solarEfficiency1: { name: "Solar Efficiency I", applied: false, cost: { rmm: 250, power: 20 }, effect: { solarPowerMultiplier: 1.5 }, unlocked: false, tab: "energy", description: "Boosts Small Solar Array output by 50%." },
+                pfcEfficiency1: { name: "PFC Efficiency I", applied: false, cost: { rmm: 2000, power: 200 }, effect: { pfcEmitterEffectiveness: 1.5 }, unlocked: false, tab: "research", researchTabId: "atmosphericEngineering", description: "Boosts PFC Emitter effectiveness by 50%." },
+            },
+            research: { 
+                advancedGreenhouseGases: { name: "Adv. Greenhouse Gases", researched: false, cost: { rmm: 2500, power: 500 }, effectSource: "pfcEfficiency1", unlocked: false, tab: "research", researchTabId: "atmosphericEngineering", description: "Unlocks PFC Efficiency I upgrade." },
+                orbitalMirrorBlueprints: { name: "Orbital Mirror Blueprints", researched: false, cost: { rmm: 10000, power: 1000 }, effect: { globalTempBonusPerSecond: 0.001 }, unlocked: false, tab: "research", researchTabId: "atmosphericEngineering", description: "Passively increases temperature gain slightly." },
+                biologicalFoundations: { name: "Biological Foundations", researched: false, cost: { rmm: 15000, power: 1500, liquidWaterSurfacePercentage: 5 }, unlocked: false, tab: "research", researchTabId: "biologicalResearch", description: "Unlocks initial Biosphere technologies."},
+                microbialAdaptation: { name: "Microbial Adaptation", researched: false, cost: { detoxifiedSoil: 1000, power: 300 }, effect: { microbeEffectiveness: 1.5 }, unlocked: false, tab: "research", researchTabId: "biologicalResearch", subStage: 4.1, description: "Boosts pioneer microbe effectiveness."},
+                basicNutrientCycling: { name: "Basic Nutrient Cycling", researched: false, cost: { detoxifiedSoil: 1500, power: 400 }, effect: { soilEnrichmentBoost: 1.2 }, unlocked: false, tab: "research", researchTabId: "biologicalResearch", subStage: 4.1, description: "Improves soil enrichment processes."},
+                atmosphericNitrogenFixation: { name: "Atm. Nitrogen Fixation", researched: false, cost: { power: 2000, biosphereHealth: 5 }, effect: { plantOxygenBoost: 1.2 }, unlocked: false, tab: "research", researchTabId: "biologicalResearch", subStage: 4.2, description: "Boosts oxygen from hardy plants."},
+            },
+            tabs: {
+                phase1: { id: "phase1", name: "Phase 1: Red Dawn", unlocked: true, parent: "content-container" },
+                energy: { id: "energy", name: "Energy Production", unlocked: false, parent: "content-container" },
+                atmosphere: { id: "atmosphere", name: "Atm. Processing", unlocked: false, parent: "content-container" },
+                phase2: { id: "phase2", name: "Phase 2: The Thaw", unlocked: false, parent: "content-container" },
+                water: { id: "water", name: "Water Mobilization", unlocked: false, parent: "content-container" },
+                research: { id: "research", name: "Research", unlocked: false, parent: "content-container" },
+                phase3: { id: "phase3", name: "Phase 3: Genesis of Blue", unlocked: false, parent: "content-container" },
+                biosphere: { id: "biosphere", name: "Biosphere Introduction", unlocked: false, parent: "content-container"},
+            },
+            activeTab: "phase1",
+
+            currentPhase: 1,
+            phaseUnlocked: { 1: true, 2: false, 3: false, 4: false, 4.1: false, 4.2: false, 4.3: false, 4.4: false, 5: false, 6: false },
+
+            log: [],
+            maxLogEntries: 15,
+            
+            activeEvent: null,
+            eventModifiers: {
+                rmmGeneration: 1, powerGeneration: 1, pressureGain: 1, liquidWaterGain: 1,
+                oxygenGain: 1, biosphereHealthGain: 1, detoxifiedSoilGain: 1,
+                solarPowerMultiplier: 1, pfcEmitterEffectiveness: 1, globalTempBonusPerSecond: 0,
+                microbeEffectiveness: 1, soilEnrichmentBoost: 1, plantOxygenBoost: 1,
+            },
+            nextEventTime: Date.now() + (Math.random() * 10 * 60000 + 5 * 60000), 
+            gameWon: false,
+            marsVisualState: 'red-dawn',
+        };
+
+        // --- DOM ELEMENTS ---
+        const rmmEl = document.getElementById('rmm');
+        const powerEl = document.getElementById('power');
+        const waterIceEl = document.getElementById('waterIce');
+        const detoxSoilEl = document.getElementById('detoxSoil');
+
+        const temperatureEl = document.getElementById('temperature');
+        const pressureEl = document.getElementById('pressure');
+        const oxygenEl = document.getElementById('oxygen');
+        const liquidWaterEl = document.getElementById('liquidWater');
+        const biosphereEl = document.getElementById('biosphere');
+        
+        const tempProgressEl = document.getElementById('temperature-progress');
+        const pressureProgressEl = document.getElementById('pressure-progress');
+        const oxygenProgressEl = document.getElementById('oxygen-progress');
+        const liquidWaterProgressEl = document.getElementById('liquidWater-progress');
+        const biosphereProgressEl = document.getElementById('biosphere-progress');
+        const tempGoalIndicatorEl = document.getElementById('temp-goal-indicator');
+
+
+        const activateRegolithHarvesterBtn = document.getElementById('activateRegolithHarvester');
+        const logListEl = document.getElementById('log-list');
+        const tabsContainerEl = document.getElementById('tabs-container');
+        const contentContainerEl = document.getElementById('content-container');
+        const marsPlanetEl = document.getElementById('mars-planet');
+
+        const powerResourceDisplayEl = document.getElementById('power-resource-display');
+        const waterIceResourceDisplayEl = document.getElementById('waterIce-resource-display');
+        const detoxSoilResourceDisplayEl = document.getElementById('detoxSoil-resource-display');
+
+
+        // --- HELPER FUNCTIONS ---
+        function formatNumber(num) {
+            if (num === null || num === undefined) return '0';
+            if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+            if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+            if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+            if (Math.abs(num) < 0.0001 && num !== 0) return num.toExponential(2);
+            if (Number.isInteger(num)) return num.toString();
+            return num.toFixed(2);
+        }
+        
+        function formatMetric(num, decimals = 2) {
+             if (num === null || num === undefined) return '0';
+             if (Math.abs(num) < 0.0001 && num !== 0) return num.toExponential(decimals);
+             return num.toFixed(decimals);
+        }
+
+
+        function addLog(message, type = '') {
+            gameState.log.unshift({ message, type, time: new Date().toLocaleTimeString() });
+            if (gameState.log.length > gameState.maxLogEntries) {
+                gameState.log.pop();
+            }
+            updateLogDisplay();
+        }
+
+        // --- UPDATE DISPLAY FUNCTIONS ---
+        function updateResourceDisplay() {
+            rmmEl.textContent = formatNumber(gameState.rmm);
+            if (gameState.tabs.energy.unlocked) {
+                powerResourceDisplayEl.classList.remove('hidden');
+                powerEl.textContent = formatNumber(gameState.power);
+            }
+            if (gameState.phaseUnlocked[2] || gameState.units.iceMiners.unlocked) { 
+                waterIceResourceDisplayEl.classList.remove('hidden');
+                waterIceEl.textContent = formatNumber(gameState.waterIce);
+            }
+             if (gameState.phaseUnlocked[3] || gameState.units.regolithProcessors.unlocked) {
+                detoxSoilResourceDisplayEl.classList.remove('hidden');
+                detoxSoilEl.textContent = formatNumber(gameState.detoxifiedSoil);
+            }
+        }
+
+        function updateMetricsDisplay() {
+            temperatureEl.textContent = formatMetric(gameState.temperature);
+            pressureEl.textContent = formatMetric(gameState.atmosphericPressure);
+            oxygenEl.textContent = formatMetric(gameState.oxygen);
+            liquidWaterEl.textContent = formatMetric(gameState.liquidWaterSurfacePercentage);
+            biosphereEl.textContent = formatMetric(gameState.biosphereHealth);
+
+            let tempProgress = Math.max(0, (gameState.temperature - gameState.initialValues.temperature) / (gameState.goals.temperature - gameState.initialValues.temperature)) * 100;
+            tempProgressEl.style.width = Math.min(100, tempProgress) + '%';
+            
+            let pressureProgress = Math.max(0, (gameState.atmosphericPressure - gameState.initialValues.atmosphericPressure) / (gameState.goals.atmosphericPressure - gameState.initialValues.atmosphericPressure)) * 100;
+            pressureProgressEl.style.width = Math.min(100, pressureProgress) + '%';
+
+            oxygenProgressEl.style.width = Math.min(100, (gameState.oxygen / gameState.goals.oxygen) * 100) + '%';
+            liquidWaterProgressEl.style.width = Math.min(100, (gameState.liquidWaterSurfacePercentage / gameState.goals.liquidWaterSurfacePercentage) * 100) + '%';
+            biosphereProgressEl.style.width = Math.min(100, (gameState.biosphereHealth / gameState.goals.biosphereHealth) * 100) + '%';
+        }
+        
+        function updateLogDisplay() {
+            logListEl.innerHTML = '';
+            gameState.log.forEach(entry => {
+                const li = document.createElement('li');
+                li.textContent = `[${entry.time}] ${entry.message}`;
+                if (entry.type) li.classList.add(entry.type);
+                logListEl.appendChild(li);
+            });
+        }
+
+        function updateMarsVisual() {
+            marsPlanetEl.className = 'mars-planet'; 
+            marsPlanetEl.classList.add(gameState.marsVisualState);
+            
+            let title = "Mars - Current State: ";
+            switch(gameState.marsVisualState) {
+                case 'red-dawn': title += "Cold and Arid."; break;
+                case 'thaw-ice-caps': title += "Ice caps shrinking."; break;
+                case 'thaw-water-glint': title += "Subtle water glint, pronounced haze."; break;
+                case 'genesis-oceans': title += "Oceans forming."; break;
+                case 'genesis-hazy-blue-sky': title += "Sky turning hazy blue."; break;
+                case 'pioneer-microbes-speckles': title += "Pioneer microbes spreading."; break;
+                case 'primitive-flora-patches': title += "Primitive flora colonizing."; break;
+                case 'invertebrate-aquatic-blooms': title += "Aquatic and invertebrate life emerging."; break;
+                case 'vertebrate-animals': title += "Vertebrate life appearing."; break;
+                case 'verdant-canopy-forests': title += "Forests and diverse biomes."; break;
+                case 'blue-planet': title += "A new Blue Planet!"; break;
+            }
+            marsPlanetEl.title = title;
+        }
+
+
+        function createTabs() {
+            tabsContainerEl.innerHTML = '';
+            Object.values(gameState.tabs).filter(tab => tab.unlocked).forEach(tabData => {
+                const button = document.createElement('button');
+                button.id = `tab-${tabData.id}`;
+                button.textContent = tabData.name;
+                button.classList.add('tab-button', 'm-1', 'py-2', 'px-3', 'rounded');
+                if (gameState.activeTab === tabData.id) {
+                    button.classList.add('active');
+                }
+                button.addEventListener('click', () => setActiveTab(tabData.id));
+                tabsContainerEl.appendChild(button);
+            });
+        }
+
+        function setActiveTab(tabId) {
+            gameState.activeTab = tabId;
+            createTabs(); 
+            renderTabContent();
+        }
+
+        function renderTabContent() {
+            contentContainerEl.innerHTML = '';
+            const activeTabId = gameState.activeTab;
+
+            Object.entries(gameState.units).forEach(([key, unit]) => {
+                if (unit.unlocked && (unit.tab === activeTabId || (gameState.tabs[activeTabId]?.isPhaseTab && unit.tab.startsWith(activeTabId)) || (unit.tab === "biosphere" && activeTabId === "biosphere" && (!unit.subStage || gameState.phaseUnlocked[unit.subStage])))) {
+                    const div = document.createElement('div');
+                    div.classList.add('unit-item');
+                    
+                    let costString = Object.entries(unit.cost)
+                        .map(([res, val]) => `${formatNumber(val)} ${res.replace(/([A-Z])/g, ' $1').replace("liquidWaterSurfacePercentage", "LW").toUpperCase()}`)
+                        .join(', ');
+                    
+                    let productionString = "";
+                    if(unit.rmmPerSecond) productionString += `${formatNumber(unit.rmmPerSecond * gameState.eventModifiers.rmmGeneration)} RMM/s. `;
+                    if(unit.powerPerSecond) productionString += `${formatNumber(unit.powerPerSecond * gameState.eventModifiers.solarPowerMultiplier * gameState.eventModifiers.powerGeneration)} P/s. `;
+                    if(unit.pressurePerSecond) productionString += `${formatNumber(unit.pressurePerSecond * gameState.eventModifiers.pressureGain)} AP/s. `;
+                    if(unit.tempPerSecond && key === 'co2Condensers') productionString += `${formatNumber(unit.tempPerSecond)} °C/s (initial). `;
+                    else if(unit.tempPerSecond) productionString += `${formatNumber(unit.tempPerSecond * gameState.eventModifiers.pfcEmitterEffectiveness)} °C/s. `;
+                    if(unit.waterIcePerSecond) productionString += `${formatNumber(unit.waterIcePerSecond)} WI/s. `;
+                    if(unit.liquidWaterPerSecond) productionString += `${formatNumber(unit.liquidWaterPerSecond * gameState.eventModifiers.liquidWaterGain)} LW/s. `;
+                    if(unit.detoxSoilPerSecond) productionString += `${formatNumber(unit.detoxSoilPerSecond * gameState.eventModifiers.detoxifiedSoilGain)} DS/s. `;
+                    // CHANGED: Added oxygenPerSecond display for Regolith Processors
+                    if(unit.oxygenPerSecond && key === 'regolithProcessors') productionString += `${formatNumber(unit.oxygenPerSecond * gameState.eventModifiers.oxygenGain)} O2%/s (trace). `;
+                    else if(unit.oxygenPerSecond) productionString += `${formatNumber(unit.oxygenPerSecond * (unit.name.includes("Cyanobacteria") || unit.name.includes("Algae") ? gameState.eventModifiers.microbeEffectiveness : 1) * (unit.name.includes("Moss") || unit.name.includes("Herb") ? gameState.eventModifiers.plantOxygenBoost : 1) * gameState.eventModifiers.oxygenGain)} O2%/s. `;
+                    if(unit.biosphereHealthPerSecond) productionString += `${formatNumber(unit.biosphereHealthPerSecond * (unit.name.includes("Cyanobacteria") || unit.name.includes("Algae") ? gameState.eventModifiers.microbeEffectiveness : 1) * gameState.eventModifiers.biosphereHealthGain)} BH%/s. `;
+
+                    div.innerHTML = `
+                        <h3>${unit.name}</h3>
+                        <p class="description">${unit.description || ''}</p>
+                        <p class="production">Produces: ${productionString || 'Varies'}</p>
+                        <p class="cost">Cost: ${costString}</p>
+                        <p class="owned">Owned: ${formatNumber(unit.count)}</p>
+                        <button id="buy-${key}">Buy</button>
+                    `;
+                    contentContainerEl.appendChild(div);
+                    document.getElementById(`buy-${key}`).addEventListener('click', () => buyUnit(key));
+                }
+            });
+
+            Object.entries(gameState.upgrades).forEach(([key, upgrade]) => {
+                if (upgrade.unlocked && !upgrade.applied && upgrade.tab === activeTabId) {
+                     const div = document.createElement('div');
+                    div.classList.add('upgrade-item');
+                    let costString = Object.entries(upgrade.cost)
+                        .map(([res, val]) => `${formatNumber(val)} ${res.replace(/([A-Z])/g, ' $1').toUpperCase()}`)
+                        .join(', ');
+                    div.innerHTML = `
+                        <h3>${upgrade.name}</h3>
+                        <p class="description">${upgrade.description || ''}</p>
+                        <p class="cost">Cost: ${costString}</p>
+                        <button id="buy-${key}">Buy Upgrade</button>
+                    `;
+                    contentContainerEl.appendChild(div);
+                    document.getElementById(`buy-${key}`).addEventListener('click', () => buyUpgrade(key));
+                }
+            });
+            
+            if (activeTabId === "research") {
+                const researchCategories = {
+                    atmosphericEngineering: "Atmospheric Engineering",
+                    biologicalResearch: "Biological Foundations",
+                };
+
+                Object.entries(researchCategories).forEach(([catId, catName]) => {
+                    const researchInCat = Object.entries(gameState.research).filter(([key, res]) => res.researchTabId === catId && res.unlocked && !res.researched && (!res.subStage || gameState.phaseUnlocked[res.subStage]));
+                    if (researchInCat.length > 0) {
+                        const catHeader = document.createElement('h3');
+                        catHeader.textContent = catName;
+                        catHeader.classList.add('text-xl', 'my-2', 'text-cyan-400');
+                        contentContainerEl.appendChild(catHeader);
+
+                        researchInCat.forEach(([key, researchItem]) => {
+                            const div = document.createElement('div');
+                            div.classList.add('research-item');
+                            let costString = Object.entries(researchItem.cost)
+                                .map(([res, val]) => `${formatNumber(val)} ${res.replace(/([A-Z])/g, ' $1').replace("liquidWaterSurfacePercentage", "LW").toUpperCase()}`)
+                                .join(', ');
+                            div.innerHTML = `
+                                <h4>${researchItem.name}</h4>
+                                <p class="description">${researchItem.description || ''}</p>
+                                <p class="cost">Cost: ${costString}</p>
+                                <button id="research-${key}">Research</button>
+                            `;
+                            contentContainerEl.appendChild(div);
+                            document.getElementById(`research-${key}`).addEventListener('click', () => startResearch(key));
+                        });
+                    }
+                });
+            }
+             if (contentContainerEl.innerHTML === '') {
+                contentContainerEl.innerHTML = `<p class="text-gray-500">Nothing available in this tab yet, or all items purchased.</p>`;
+            }
+        }
+
+
+        // --- GAME LOGIC ---
+        activateRegolithHarvesterBtn.addEventListener('click', () => {
+            gameState.rmm += 1;
+            updateResourceDisplay();
+            checkUnlocks(); 
+        });
+
+        function buyUnit(unitKey) {
+            const unit = gameState.units[unitKey];
+            let canAfford = true;
+            for (const resource in unit.cost) {
+                if (gameState[resource] < unit.cost[resource]) {
+                    canAfford = false;
+                    break;
+                }
+            }
+
+            if (canAfford) {
+                for (const resource in unit.cost) {
+                    gameState[resource] -= unit.cost[resource];
+                }
+                unit.count++;
+                addLog(`Purchased ${unit.name}. Total: ${unit.count}`);
+            } else {
+                addLog(`Not enough resources for ${unit.name}.`, 'event-negative');
+            }
+            updateResourceDisplay();
+            renderTabContent(); 
+        }
+        
+        function buyUpgrade(upgradeKey) {
+            const upgrade = gameState.upgrades[upgradeKey];
+            let canAfford = true;
+            for (const resource in upgrade.cost) {
+                if (gameState[resource] < upgrade.cost[resource]) {
+                    canAfford = false;
+                    break;
+                }
+            }
+
+            if (canAfford && !upgrade.applied) {
+                for (const resource in upgrade.cost) {
+                    gameState[resource] -= upgrade.cost[resource];
+                }
+                upgrade.applied = true;
+                applyUpgradeEffect(upgrade.effect);
+                addLog(`Upgrade purchased: ${upgrade.name}.`, 'phase-unlock');
+            } else if (upgrade.applied) {
+                 addLog(`${upgrade.name} already applied.`, 'event-negative');
+            }
+            else {
+                addLog(`Not enough resources for ${upgrade.name}.`, 'event-negative');
+            }
+            updateResourceDisplay();
+            renderTabContent();
+        }
+
+        function applyUpgradeEffect(effect) {
+            if (effect.solarPowerMultiplier) {
+                gameState.eventModifiers.solarPowerMultiplier *= effect.solarPowerMultiplier;
+            }
+            if (effect.pfcEmitterEffectiveness) {
+                gameState.eventModifiers.pfcEmitterEffectiveness *= effect.pfcEmitterEffectiveness;
+            }
+        }
+        
+        function startResearch(researchKey) {
+            const researchItem = gameState.research[researchKey];
+            let canAfford = true;
+            for (const resource in researchItem.cost) {
+                if (gameState[resource] < researchItem.cost[resource]) {
+                    canAfford = false;
+                    break;
+                }
+            }
+
+            if (canAfford && !researchItem.researched) {
+                for (const resource in researchItem.cost) {
+                    gameState[resource] -= researchItem.cost[resource];
+                }
+                researchItem.researched = true;
+                applyResearchEffect(researchItem);
+                addLog(`Research completed: ${researchItem.name}.`, 'phase-unlock');
+            } else if (researchItem.researched) {
+                addLog(`${researchItem.name} already researched.`, 'event-negative');
+            } else {
+                addLog(`Not enough resources for ${researchItem.name}.`, 'event-negative');
+            }
+            updateResourceDisplay();
+            renderTabContent(); 
+            checkUnlocks(); 
+        }
+
+        function applyResearchEffect(researchItem) {
+            if (researchItem.effectSource && gameState.upgrades[researchItem.effectSource]) {
+                gameState.upgrades[researchItem.effectSource].unlocked = true; 
+                addLog(`Unlocked Upgrade: ${gameState.upgrades[researchItem.effectSource].name}.`);
+            }
+            if (researchItem.effect && researchItem.effect.globalTempBonusPerSecond) {
+                gameState.eventModifiers.globalTempBonusPerSecond += researchItem.effect.globalTempBonusPerSecond;
+            }
+             if (researchItem.effect && researchItem.effect.microbeEffectiveness) {
+                gameState.eventModifiers.microbeEffectiveness *= researchItem.effect.microbeEffectiveness;
+            }
+            if (researchItem.effect && researchItem.effect.soilEnrichmentBoost) {
+                gameState.eventModifiers.soilEnrichmentBoost *= researchItem.effect.soilEnrichmentBoost;
+            }
+            if (researchItem.effect && researchItem.effect.plantOxygenBoost) {
+                gameState.eventModifiers.plantOxygenBoost *= researchItem.effect.plantOxygenBoost;
+            }
+
+            if (researchItem.name === "Biological Foundations") {
+                gameState.tabs.biosphere.unlocked = true;
+                gameState.phaseUnlocked[4.1] = true; 
+                addLog("Biosphere Introduction tab unlocked! Pioneer Microbes available.", "phase-unlock");
+                checkUnlocks(); 
+            }
+        }
+
+
+        function gameLoop() {
+            if (gameState.gameWon) return;
+
+            let rmmGained = 0;
+            let powerGained = 0;
+            let powerConsumed = 0;
+            let pressureGained = 0;
+            let tempGained = 0;
+            let waterIceGained = 0;
+            let waterIceConsumed = 0;
+            let liquidWaterGained = 0;
+            let detoxSoilGained = 0;
+            let oxygenGained = 0;
+            let biosphereHealthGained = 0;
+
+            if (gameState.units.automatedRovers.count > 0) {
+                rmmGained += gameState.units.automatedRovers.count * gameState.units.automatedRovers.rmmPerSecond * gameState.eventModifiers.rmmGeneration;
+            }
+            if (gameState.units.smallSolarArrays.count > 0) {
+                powerGained += gameState.units.smallSolarArrays.count * gameState.units.smallSolarArrays.powerPerSecond * gameState.eventModifiers.solarPowerMultiplier * gameState.eventModifiers.powerGeneration;
+            }
+            if (gameState.units.geothermalDrills.count > 0) {
+                 powerGained += gameState.units.geothermalDrills.count * gameState.units.geothermalDrills.powerPerSecond * gameState.eventModifiers.powerGeneration;
+            }
+
+            let co2CondenserOperationalPower = gameState.units.co2Condensers.count * gameState.units.co2Condensers.powerCostPerSecond;
+            if (gameState.units.co2Condensers.count > 0 && gameState.power >= co2CondenserOperationalPower) {
+                powerConsumed += co2CondenserOperationalPower;
+                pressureGained += gameState.units.co2Condensers.count * gameState.units.co2Condensers.pressurePerSecond * gameState.eventModifiers.pressureGain;
+                tempGained += gameState.units.co2Condensers.count * gameState.units.co2Condensers.tempPerSecond; 
+            }
+            
+            let pfcEmitterOperationalPower = gameState.units.pfcEmitters.count * gameState.units.pfcEmitters.powerCostPerSecond;
+            if (gameState.units.pfcEmitters.count > 0 && gameState.power >= pfcEmitterOperationalPower) {
+                powerConsumed += pfcEmitterOperationalPower;
+                tempGained += gameState.units.pfcEmitters.count * gameState.units.pfcEmitters.tempPerSecond * gameState.eventModifiers.pfcEmitterEffectiveness;
+            }
+            
+            let atmThickenerOperationalPower = gameState.units.atmosphericThickeners.count * gameState.units.atmosphericThickeners.powerCostPerSecond;
+            if (gameState.units.atmosphericThickeners.count > 0 && gameState.power >= atmThickenerOperationalPower) {
+                powerConsumed += atmThickenerOperationalPower;
+                pressureGained += gameState.units.atmosphericThickeners.count * gameState.units.atmosphericThickeners.pressurePerSecond * gameState.eventModifiers.pressureGain;
+            }
+
+            let iceMinerOperationalPower = gameState.units.iceMiners.count * gameState.units.iceMiners.powerCostPerSecond;
+            if (gameState.units.iceMiners.count > 0 && gameState.power >= iceMinerOperationalPower) {
+                powerConsumed += iceMinerOperationalPower;
+                waterIceGained += gameState.units.iceMiners.count * gameState.units.iceMiners.waterIcePerSecond;
+            }
+
+            let iceMelterPowerCost = gameState.units.iceMelters.count * gameState.units.iceMelters.powerCostPerSecond;
+            let iceMelterWaterIceCost = gameState.units.iceMelters.count * gameState.units.iceMelters.waterIceCostPerSecond;
+            if (gameState.units.iceMelters.count > 0 && gameState.power >= iceMelterPowerCost && gameState.waterIce >= iceMelterWaterIceCost) {
+                powerConsumed += iceMelterPowerCost;
+                waterIceConsumed += iceMelterWaterIceCost;
+                liquidWaterGained += gameState.units.iceMelters.count * gameState.units.iceMelters.liquidWaterPerSecond * gameState.eventModifiers.liquidWaterGain;
+            }
+
+            let pumpPowerCost = gameState.units.largeWaterPumps.count * gameState.units.largeWaterPumps.powerCostPerSecond;
+            if (gameState.units.largeWaterPumps.count > 0 && gameState.power >= pumpPowerCost) {
+                powerConsumed += pumpPowerCost;
+                liquidWaterGained += gameState.units.largeWaterPumps.count * gameState.units.largeWaterPumps.liquidWaterPerSecond * gameState.eventModifiers.liquidWaterGain;
+            }
+
+            // CHANGED: Regolith Processors now produce oxygen
+            let processorPowerCost = gameState.units.regolithProcessors.count * gameState.units.regolithProcessors.powerCostPerSecond;
+            if (gameState.units.regolithProcessors.count > 0 && gameState.power >= processorPowerCost) {
+                powerConsumed += processorPowerCost;
+                detoxSoilGained += gameState.units.regolithProcessors.count * gameState.units.regolithProcessors.detoxSoilPerSecond * gameState.eventModifiers.detoxifiedSoilGain;
+                if (gameState.units.regolithProcessors.oxygenPerSecond) {
+                    oxygenGained += gameState.units.regolithProcessors.count * gameState.units.regolithProcessors.oxygenPerSecond * gameState.eventModifiers.oxygenGain;
+                }
+            }
+            
+            const microbeUnits = ['perchlorateBioreactors', 'cyanobacteriaVats', 'algaeAccelerators'];
+            microbeUnits.forEach(key => {
+                const unit = gameState.units[key];
+                if (unit.count > 0 && unit.unlocked) {
+                    let canOperate = gameState.power >= (unit.cost.power || 0) * unit.count / 10; 
+                     if (unit.cost.liquidWaterSurfacePercentage) canOperate = canOperate && gameState.liquidWaterSurfacePercentage >= unit.cost.liquidWaterSurfacePercentage * 0.1 * unit.count; 
+                     if (unit.cost.detoxifiedSoil) canOperate = canOperate && gameState.detoxifiedSoil >= unit.cost.detoxifiedSoil * 0.1 * unit.count; 
+
+                    if (canOperate) {
+                        powerConsumed += (unit.cost.power || 0) * unit.count / 100; 
+                        if (unit.oxygenPerSecond) oxygenGained += unit.count * unit.oxygenPerSecond * gameState.eventModifiers.microbeEffectiveness * gameState.eventModifiers.oxygenGain;
+                        if (unit.biosphereHealthPerSecond) biosphereHealthGained += unit.count * unit.biosphereHealthPerSecond * gameState.eventModifiers.microbeEffectiveness * gameState.eventModifiers.biosphereHealthGain;
+                        if (unit.detoxSoilRateBoost) detoxSoilGained += unit.count * unit.detoxSoilRateBoost * gameState.eventModifiers.detoxifiedSoilGain; 
+                    }
+                }
+            });
+            
+            const floraUnits = ['mossDrones', 'herbSeeders'];
+            floraUnits.forEach(key => {
+                const unit = gameState.units[key];
+                 if (unit.count > 0 && unit.unlocked) {
+                    let canOperate = gameState.power >= (unit.cost.power || 0) * unit.count / 10;
+                    if (canOperate) {
+                        powerConsumed += (unit.cost.power || 0) * unit.count / 100;
+                        if (unit.oxygenPerSecond) oxygenGained += unit.count * unit.oxygenPerSecond * gameState.eventModifiers.plantOxygenBoost * gameState.eventModifiers.oxygenGain;
+                        if (unit.biosphereHealthPerSecond) biosphereHealthGained += unit.count * unit.biosphereHealthPerSecond * gameState.eventModifiers.biosphereHealthGain;
+                    }
+                 }
+            });
+
+            const advancedBioUnits = ['phytoplanktonDispensers', 'earthwormSystems', 'insectCultivators', 'fishHatcheries', 'smallHerbivoreRelease', 'birdSanctuaries', 'largeMammalIntroduction', 'forestationUnits'];
+            advancedBioUnits.forEach(key => {
+                const unit = gameState.units[key];
+                if (unit.count > 0 && unit.unlocked) {
+                    if (unit.oxygenPerSecond) oxygenGained += unit.count * unit.oxygenPerSecond * gameState.eventModifiers.oxygenGain;
+                    if (unit.biosphereHealthPerSecond) biosphereHealthGained += unit.count * unit.biosphereHealthPerSecond * gameState.eventModifiers.biosphereHealthGain;
+                    if (unit.detoxSoilRateBoost) detoxSoilGained += unit.count * unit.detoxSoilRateBoost * gameState.eventModifiers.soilEnrichmentBoost * gameState.eventModifiers.detoxifiedSoilGain;
+                }
+            });
+
+            gameState.rmm += rmmGained;
+            gameState.power += powerGained;
+            gameState.power -= powerConsumed;
+            if (gameState.power < 0) gameState.power = 0; 
+
+            gameState.atmosphericPressure += pressureGained;
+            gameState.temperature += tempGained;
+            gameState.temperature += gameState.eventModifiers.globalTempBonusPerSecond; 
+
+            gameState.waterIce += waterIceGained;
+            gameState.waterIce -= waterIceConsumed;
+            if (gameState.waterIce < 0) gameState.waterIce = 0;
+            
+            gameState.liquidWaterSurfacePercentage += liquidWaterGained;
+            gameState.detoxifiedSoil += detoxSoilGained;
+            gameState.oxygen += oxygenGained;
+            gameState.biosphereHealth += biosphereHealthGained;
+
+            gameState.temperature = Math.min(gameState.temperature, gameState.goals.temperature + 5);
+            gameState.atmosphericPressure = Math.min(gameState.atmosphericPressure, gameState.goals.atmosphericPressure + 50);
+            gameState.oxygen = Math.min(gameState.oxygen, gameState.goals.oxygen + 1);
+            gameState.liquidWaterSurfacePercentage = Math.min(gameState.liquidWaterSurfacePercentage, gameState.goals.liquidWaterSurfacePercentage + 10);
+            gameState.biosphereHealth = Math.min(gameState.biosphereHealth, gameState.goals.biosphereHealth + 5);
+
+            updateResourceDisplay();
+            updateMetricsDisplay();
+            checkUnlocks();
+            checkPhaseCompletion();
+            handleRandomEvents();
+            
+            if (!gameState.gameWon &&
+                gameState.temperature >= gameState.goals.temperature &&
+                gameState.atmosphericPressure >= gameState.goals.atmosphericPressure &&
+                gameState.oxygen >= gameState.goals.oxygen &&
+                gameState.liquidWaterSurfacePercentage >= gameState.goals.liquidWaterSurfacePercentage &&
+                gameState.biosphereHealth >= gameState.goals.biosphereHealth) {
+                winGame();
+            }
+
+            setTimeout(gameLoop, 1000); 
+        }
+        
+        function winGame() {
+            gameState.gameWon = true;
+            gameState.marsVisualState = 'blue-planet';
+            updateMarsVisual();
+            addLog("CONGRATULATIONS! Mars has been successfully terraformed into a Blue Planet!", "phase-unlock");
+            addLog("Your grand vision is complete. Mars stands as a testament to ingenuity: a self-sustaining world, a second home for humanity.", "phase-unlock");
+            contentContainerEl.innerHTML = `
+                <h2 class="text-2xl text-green-400 font-bold text-center">TERRAFORMING COMPLETE!</h2>
+                <p class="text-center mt-4">Mars is now a vibrant, self-sustaining Blue Planet. Thank you for playing!</p>
+                <p class="text-center mt-2">Final Metrics:</p>
+                <ul class="text-center list-none">
+                    <li>Temperature: ${formatMetric(gameState.temperature)}°C</li>
+                    <li>Atmospheric Pressure: ${formatMetric(gameState.atmosphericPressure)} mbar</li>
+                    <li>Oxygen: ${formatMetric(gameState.oxygen)}%</li>
+                    <li>Liquid Water: ${formatMetric(gameState.liquidWaterSurfacePercentage)}% Surface</li>
+                    <li>Biosphere Health: ${formatMetric(gameState.biosphereHealth)}%</li>
+                </ul>
+            `;
+            activateRegolithHarvesterBtn.disabled = true;
+        }
+
+
+        // --- UNLOCKS & PHASES ---
+        function checkUnlocks() {
+            let newUnlockOccurred = false;
+
+            if (!gameState.units.automatedRovers.unlocked && gameState.rmm >= 10) {
+                gameState.units.automatedRovers.unlocked = true;
+                addLog("Unit Unlocked: Automated Rovers available in Phase 1 tab.", "phase-unlock");
+                newUnlockOccurred = true;
+            }
+            if (!gameState.tabs.energy.unlocked && gameState.rmm >= 50) {
+                gameState.tabs.energy.unlocked = true;
+                gameState.units.smallSolarArrays.unlocked = true;
+                addLog("Tab Unlocked: Energy Production! Small Solar Arrays available.", "phase-unlock");
+                newUnlockOccurred = true;
+            }
+            if (!gameState.tabs.atmosphere.unlocked && gameState.power >= 5) {
+                gameState.tabs.atmosphere.unlocked = true;
+                gameState.units.co2Condensers.unlocked = true;
+                addLog("Tab Unlocked: Basic Atmospheric Processing! CO2 Condensers available.", "phase-unlock");
+                newUnlockOccurred = true;
+            }
+            
+            if (gameState.rmm >= 5 && !tempGoalIndicatorEl.classList.contains('hidden')) {
+            } else if (gameState.rmm >=5) {
+                 tempGoalIndicatorEl.classList.remove('hidden');
+            }
+
+            if (gameState.currentPhase === 2) {
+                if (!gameState.units.pfcEmitters.unlocked) {
+                    gameState.units.pfcEmitters.unlocked = true;
+                    gameState.tabs.phase2.unlocked = true; 
+                    addLog("Unit Unlocked: PFC Emitters available in Phase 2 tab.", "phase-unlock");
+                    newUnlockOccurred = true;
+                }
+                if (!gameState.upgrades.solarEfficiency1.unlocked && gameState.units.smallSolarArrays.count > 0) {
+                    gameState.upgrades.solarEfficiency1.unlocked = true;
+                     addLog("Upgrade Unlocked: Solar Efficiency I available in Energy tab.", "phase-unlock");
+                    newUnlockOccurred = true;
+                }
+                 if (!gameState.units.atmosphericThickeners.unlocked && gameState.units.co2Condensers.count > 0) {
+                    gameState.units.atmosphericThickeners.unlocked = true;
+                    addLog("Unit Unlocked: Atmospheric Thickeners available in Phase 2 tab.", "phase-unlock");
+                    newUnlockOccurred = true;
+                }
+                if (!gameState.tabs.research.unlocked && gameState.temperature > -30) { 
+                    gameState.tabs.research.unlocked = true;
+                    gameState.research.advancedGreenhouseGases.unlocked = true;
+                    gameState.research.orbitalMirrorBlueprints.unlocked = true;
+                    addLog("Tab Unlocked: Research! Atmospheric Engineering projects available.", "phase-unlock");
+                    newUnlockOccurred = true;
+                }
+                 if (!gameState.units.iceMiners.unlocked && gameState.temperature > -25) { 
+                    gameState.units.iceMiners.unlocked = true;
+                    addLog("Unit Unlocked: Ice Miners available in Phase 2 tab.", "phase-unlock");
+                    newUnlockOccurred = true;
+                }
+                if (!gameState.tabs.water.unlocked && gameState.waterIce > 10) {
+                    gameState.tabs.water.unlocked = true;
+                    gameState.units.iceMelters.unlocked = true;
+                    addLog("Tab Unlocked: Water Mobilization! Ice Melters available.", "phase-unlock");
+                    newUnlockOccurred = true;
+                }
+            }
+            
+            if (gameState.currentPhase === 3) {
+                gameState.tabs.phase3.unlocked = true;
+                if (!gameState.units.largeWaterPumps.unlocked) {
+                    gameState.units.largeWaterPumps.unlocked = true; newUnlockOccurred = true;
+                    addLog("Unit Unlocked: Large Water Pumps available in Phase 3 tab.", "phase-unlock");
+                }
+                if (!gameState.units.geothermalDrills.unlocked && gameState.liquidWaterSurfacePercentage >= 0.5) { 
+                    gameState.units.geothermalDrills.unlocked = true; newUnlockOccurred = true;
+                    addLog("Unit Unlocked: Geothermal Drills available in Phase 3 tab.", "phase-unlock");
+                }
+                if (!gameState.units.regolithProcessors.unlocked) {
+                    gameState.units.regolithProcessors.unlocked = true; newUnlockOccurred = true;
+                    addLog("Unit Unlocked: Regolith Processors available. Start creating Detoxified Soil and trace Oxygen!", "phase-unlock");
+                }
+                 if (!gameState.research.biologicalFoundations.unlocked && gameState.tabs.research.unlocked) {
+                    gameState.research.biologicalFoundations.unlocked = true; newUnlockOccurred = true;
+                    addLog("Research Unlocked: Biological Foundations in Research tab.", "phase-unlock");
+                }
+            }
+
+            if (gameState.currentPhase === 4 && gameState.phaseUnlocked[4.1]) {
+                if (!gameState.units.perchlorateBioreactors.unlocked) { gameState.units.perchlorateBioreactors.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Perchlorate Bioreactors.", "phase-unlock"); }
+                if (!gameState.units.cyanobacteriaVats.unlocked) { gameState.units.cyanobacteriaVats.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Cyanobacteria Vats.", "phase-unlock"); }
+                if (!gameState.units.algaeAccelerators.unlocked) { gameState.units.algaeAccelerators.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Algae Accelerators.", "phase-unlock"); }
+                if (!gameState.research.microbialAdaptation.unlocked) { gameState.research.microbialAdaptation.unlocked = true; newUnlockOccurred = true; addLog("Research Unlocked: Microbial Adaptation.", "phase-unlock"); }
+                if (!gameState.research.basicNutrientCycling.unlocked) { gameState.research.basicNutrientCycling.unlocked = true; newUnlockOccurred = true; addLog("Research Unlocked: Basic Nutrient Cycling.", "phase-unlock"); }
+            }
+            if (gameState.currentPhase === 4 && gameState.phaseUnlocked[4.2]) {
+                if (!gameState.units.mossDrones.unlocked) { gameState.units.mossDrones.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Moss Spreading Drones.", "phase-unlock"); }
+                if (!gameState.units.herbSeeders.unlocked) { gameState.units.herbSeeders.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Hardy Herb Seeders.", "phase-unlock"); }
+                if (!gameState.research.atmosphericNitrogenFixation.unlocked) { gameState.research.atmosphericNitrogenFixation.unlocked = true; newUnlockOccurred = true; addLog("Research Unlocked: Atmospheric Nitrogen Fixation.", "phase-unlock"); }
+            }
+            if (gameState.currentPhase === 4 && gameState.phaseUnlocked[4.3]) {
+                if(!gameState.units.phytoplanktonDispensers.unlocked) { gameState.units.phytoplanktonDispensers.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Phytoplankton Dispensers.", "phase-unlock");}
+                if(!gameState.units.earthwormSystems.unlocked) { gameState.units.earthwormSystems.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Earthworm Introduction Systems.", "phase-unlock");}
+                if(!gameState.units.insectCultivators.unlocked) { gameState.units.insectCultivators.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Insect Cultivators.", "phase-unlock");}
+            }
+            if (gameState.currentPhase === 4 && gameState.phaseUnlocked[4.4]) {
+                 if(!gameState.units.fishHatcheries.unlocked) { gameState.units.fishHatcheries.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Cold-Water Fish Hatcheries.", "phase-unlock");}
+                 if(!gameState.units.smallHerbivoreRelease.unlocked) { gameState.units.smallHerbivoreRelease.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Small Herbivore Release Programs.", "phase-unlock");}
+                 if(!gameState.units.birdSanctuaries.unlocked) { gameState.units.birdSanctuaries.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Bird Sanctuaries.", "phase-unlock");}
+            }
+            if (gameState.currentPhase === 5 && gameState.phaseUnlocked[5]) {
+                if(!gameState.units.largeMammalIntroduction.unlocked) { gameState.units.largeMammalIntroduction.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Large Mammal Introduction Programs.", "phase-unlock");}
+                if(!gameState.units.forestationUnits.unlocked) { gameState.units.forestationUnits.unlocked = true; newUnlockOccurred = true; addLog("Unit Unlocked: Forestation Units.", "phase-unlock");}
+            }
+
+            if (newUnlockOccurred) {
+                createTabs(); 
+                renderTabContent(); 
+            }
+        }
+
+        function checkPhaseCompletion() {
+            let phaseChanged = false;
+            if (gameState.currentPhase === 1 && 
+                gameState.temperature >= -50 && 
+                gameState.units.automatedRovers.count >= 3 && 
+                gameState.units.co2Condensers.count >= 2 && 
+                !gameState.phaseUnlocked[2]) {
+                gameState.currentPhase = 2;
+                gameState.phaseUnlocked[2] = true;
+                phaseChanged = true;
+                addLog("PHASE 2 UNLOCKED: The Thaw! Initial infrastructure established. The ancient ice of Mars begins to stir.", "phase-unlock");
+                gameState.marsVisualState = 'thaw-ice-caps';
+                setActiveTab('phase2');
+            }
+            if (gameState.currentPhase === 2 && gameState.liquidWaterSurfacePercentage >= 5 && gameState.atmosphericPressure >= 10 && !gameState.phaseUnlocked[3]) { // Using user's updated pressure condition
+                gameState.currentPhase = 3;
+                gameState.phaseUnlocked[3] = true;
+                phaseChanged = true;
+                addLog("PHASE 3 UNLOCKED: The Genesis of Blue! Water flows, transformation accelerates.", "phase-unlock");
+                gameState.marsVisualState = 'genesis-oceans';
+                setActiveTab('phase3');
+            }
+            // CHANGED: Phase 4 unlock condition (Detoxified Soil and Oxygen)
+            if (gameState.currentPhase === 3 && gameState.detoxifiedSoil >= 250 && gameState.oxygen >= 0.5 && !gameState.phaseUnlocked[4]) {
+                gameState.currentPhase = 4;
+                gameState.phaseUnlocked[4] = true; 
+                gameState.phaseUnlocked[4.1] = true; 
+                phaseChanged = true;
+                addLog("PHASE 4 UNLOCKED: The Seeds of Life! Trace oxygen detected. The planet is ready for its first inhabitants.", "phase-unlock");
+                gameState.marsVisualState = 'pioneer-microbes-speckles';
+                if(gameState.tabs.biosphere.unlocked) setActiveTab('biosphere'); else checkUnlocks(); 
+            }
+
+            if (gameState.currentPhase === 4) {
+                if (gameState.phaseUnlocked[4.1] && !gameState.phaseUnlocked[4.2] && gameState.biosphereHealth >= 10 && gameState.oxygen >= 1) {
+                    gameState.phaseUnlocked[4.2] = true; phaseChanged = true;
+                    addLog("Stage 4b Unlocked: Primitive Flora! Mosses and hardy plants begin to colonize.", "phase-unlock");
+                    gameState.marsVisualState = 'primitive-flora-patches';
+                }
+                if (gameState.phaseUnlocked[4.2] && !gameState.phaseUnlocked[4.3] && gameState.biosphereHealth >= 25 && gameState.liquidWaterSurfacePercentage >= 15) { 
+                    gameState.phaseUnlocked[4.3] = true; phaseChanged = true;
+                    addLog("Stage 4c Unlocked: Invertebrate & Aquatic Life! Oceans teem, tiny creatures populate.", "phase-unlock");
+                    gameState.marsVisualState = 'invertebrate-aquatic-blooms';
+                }
+                if (gameState.phaseUnlocked[4.3] && !gameState.phaseUnlocked[4.4] && gameState.biosphereHealth >= 50 && gameState.oxygen >= 13) {
+                    gameState.phaseUnlocked[4.4] = true; phaseChanged = true;
+                    addLog("Stage 4d Unlocked: Vertebrate Introduction! Complex life thrives.", "phase-unlock");
+                    gameState.marsVisualState = 'vertebrate-animals';
+                }
+            }
+            if (gameState.currentPhase === 4 && gameState.phaseUnlocked[4.4] && gameState.biosphereHealth >= 75 && gameState.oxygen >= 21 && !gameState.phaseUnlocked[5]) {
+                gameState.currentPhase = 5;
+                gameState.phaseUnlocked[5] = true;
+                phaseChanged = true;
+                addLog("PHASE 5 UNLOCKED: The Verdant Canopy! The grand tapestry of life is complete.", "phase-unlock");
+                gameState.marsVisualState = 'verdant-canopy-forests';
+                 if(gameState.tabs.biosphere.unlocked) setActiveTab('biosphere');
+            }
+            
+            if (phaseChanged) {
+                updateMarsVisual();
+                checkUnlocks(); 
+                createTabs();
+                renderTabContent();
+            }
+            
+            if (gameState.currentPhase === 2 && gameState.marsVisualState === 'thaw-ice-caps' && gameState.liquidWaterSurfacePercentage > 0.1) {
+                gameState.marsVisualState = 'thaw-water-glint'; updateMarsVisual();
+            }
+            if (gameState.currentPhase === 3 && gameState.marsVisualState === 'genesis-oceans' && gameState.atmosphericPressure > 50) {
+                gameState.marsVisualState = 'genesis-hazy-blue-sky'; updateMarsVisual();
+            }
+        }
+        
+        // --- RANDOM EVENTS ---
+        const randomEvents = [
+            { id: "geothermalSurge", name: "Geothermal Surge", positive: true, logStart: "EVENT: Geothermal Surge detected! Power generation boosted.", logEnd: "EVENT: Geothermal Surge subsides.", effect: { powerGeneration: 1.5 }, duration: 90, minPhase: 1 },
+            { id: "atmosphericAnomaly", name: "Atmospheric Anomaly", positive: true, logStart: "EVENT: Atmospheric Anomaly! Pressure gains accelerated.", logEnd: "EVENT: Anomaly dissipates.", effect: { pressureGain: 1.3 }, duration: 120, minPhase: 1 },
+            { id: "subsurfaceWaterVein", name: "Subsurface Water Vein", positive: true, logStart: "EVENT: Water Vein discovered! Liquid Water production increased.", logEnd: "EVENT: Water Vein exhausted.", effect: { liquidWaterGain: 1.4 }, duration: 90, minPhase: 2 },
+            { id: "microbialBloom", name: "Microbial Bloom", positive: true, logStart: "EVENT: Microbial Bloom! O2 & Biosphere Health surging.", logEnd: "EVENT: Bloom stabilizes.", effect: { oxygenGain: 1.5, biosphereHealthGain: 1.5 }, duration: 150, minPhase: 4 },
+            { id: "richRegolith", name: "Rich Regolith Deposit", positive: true, logStart: "EVENT: Rich Regolith Deposit! RMM harvesting boosted.", logEnd: "EVENT: Deposit depleted.", effect: { rmmGeneration: 1.6 }, duration: 60, minPhase: 1 },
+            { id: "dustStorm", name: "Global Dust Storm", positive: false, logStart: "EVENT: Global Dust Storm! Solar Power reduced.", logEnd: "EVENT: Dust Storm clears.", effect: { solarPowerMultiplier: 0.25 }, duration: 120, minPhase: 1 }, 
+            { id: "perchlorateFlareUp", name: "Perchlorate Contamination", positive: false, logStart: "EVENT: Perchlorate Flare-up! Detox. Soil & Biosphere hindered.", logEnd: "EVENT: Contamination subsides.", effect: { detoxifiedSoilGain: 0.5, biosphereHealthGain: 0.75 }, duration: 90, minPhase: 3 },
+            { id: "atmosphericLeak", name: "Minor Atmospheric Leak", positive: false, logStart: "EVENT: Minor Atmospheric Leak! Pressure gains reduced.", logEnd: "EVENT: Leak sealed.", effect: { pressureGain: 0.6 }, duration: 60, minPhase: 2 },
+            { id: "equipmentMalfunction", name: "Equipment Malfunction Wave", positive: false, logStart: "EVENT: Equipment Malfunctions! Production reduced.", logEnd: "EVENT: Malfunctions resolved.", effect: { rmmGeneration: 0.8, powerGeneration: 0.8, liquidWaterGain: 0.8 }, duration: 100, minPhase: 2 },
+            { id: "biologicalSetback", name: "Biological Setback", positive: false, logStart: "EVENT: Biological Setback! O2 & Biosphere struggling.", logEnd: "EVENT: Biosphere recovers.", effect: { oxygenGain: 0.6, biosphereHealthGain: 0.6 }, duration: 120, minPhase: 4 },
+        ];
+
+        function handleRandomEvents() {
+            const now = Date.now();
+            if (gameState.activeEvent) {
+                if (now >= gameState.activeEvent.startTime + gameState.activeEvent.duration * 1000) {
+                    addLog(gameState.activeEvent.logEnd, gameState.activeEvent.positive ? 'event-positive' : 'event-negative');
+                    for (const key in gameState.activeEvent.effect) {
+                        if (gameState.eventModifiers.hasOwnProperty(key)) {
+                             if (key === 'solarPowerMultiplier') gameState.eventModifiers[key] = 1; 
+                             else gameState.eventModifiers[key] /= gameState.activeEvent.effect[key]; 
+                        }
+                    }
+                    gameState.activeEvent = null;
+                    gameState.nextEventTime = now + (Math.random() * 10 * 60000 + 5 * 60000); 
+                }
+            } else if (now >= gameState.nextEventTime) {
+                const availableEvents = randomEvents.filter(event => gameState.currentPhase >= event.minPhase);
+                if (availableEvents.length > 0) {
+                    const event = availableEvents[Math.floor(Math.random() * availableEvents.length)];
+                    gameState.activeEvent = { ...event, startTime: now };
+                    addLog(event.logStart, event.positive ? 'event-positive' : 'event-negative');
+                     for (const key in event.effect) {
+                        if (gameState.eventModifiers.hasOwnProperty(key)) {
+                            gameState.eventModifiers[key] *= event.effect[key];
+                        }
+                    }
+                } else {
+                     gameState.nextEventTime = now + (1 * 60000); 
+                }
+            }
+        }
+
+        // --- INITIALIZATION ---
+        function init() {
+            addLog("Mars Terraforming Initiative Online. Systems Nominal.");
+            addLog("Phase 1: The Red Dawn. Focus on RMM extraction and initial warming.");
+            updateResourceDisplay();
+            updateMetricsDisplay();
+            updateMarsVisual();
+            createTabs();
+            setActiveTab('phase1'); 
+            gameLoop();
+        }
+
+        init();
+    </script>
+</body>
+</html>

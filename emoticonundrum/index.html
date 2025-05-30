@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoticonundrum</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile */
+        }
+        .chat-bubble {
+            padding: 8px 12px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+        .player-message .chat-bubble {
+            background-color: #007bff; /* Tailwind: bg-blue-500 */
+            color: white;
+            margin-left: auto;
+        }
+        .system-message .chat-bubble {
+            background-color: #e9ecef; /* Tailwind: bg-gray-200 */
+            color: #333; /* Tailwind: text-gray-800 */
+            margin-right: auto;
+        }
+        .emoji-button {
+            transition: transform 0.1s ease-in-out;
+        }
+        .emoji-button:active {
+            transform: scale(0.9);
+        }
+        .emoji-grid-item.locked {
+            opacity: 0.3;
+            filter: grayscale(100%);
+        }
+        #message-list {
+            scroll-behavior: smooth;
+        }
+        /* Custom scrollbar for webkit browsers */
+        #message-list::-webkit-scrollbar, #emoji-palette::-webkit-scrollbar, #unlocked-emojis-grid-container::-webkit-scrollbar { /* Corrected ID */
+            width: 8px;
+        }
+        #message-list::-webkit-scrollbar-track, #emoji-palette::-webkit-scrollbar-track, #unlocked-emojis-grid-container::-webkit-scrollbar-track { /* Corrected ID */
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #message-list::-webkit-scrollbar-thumb, #emoji-palette::-webkit-scrollbar-thumb, #unlocked-emojis-grid-container::-webkit-scrollbar-thumb { /* Corrected ID */
+            background: #888;
+            border-radius: 10px;
+        }
+        #message-list::-webkit-scrollbar-thumb:hover, #emoji-palette::-webkit-scrollbar-thumb:hover, #unlocked-emojis-grid-container::-webkit-scrollbar-thumb:hover { /* Corrected ID */
+            background: #555;
+        }
+        /* Modal styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .modal-close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .modal-close-button:hover,
+        .modal-close-button:focus {
+            color: black;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-2 sm:p-4">
+
+    <div id="game-container" class="w-full max-w-2xl bg-white shadow-xl rounded-lg flex flex-col h-[95vh] sm:h-[90vh]">
+        <header class="bg-blue-600 text-white p-4 rounded-t-lg">
+            <h1 class="text-2xl font-bold text-center">Emoticonundrum</h1>
+            <p id="progress-counter" class="text-sm text-center mt-1">Discovered: 0 / 0</p>
+        </header>
+
+        <div id="chat-window" class="flex-grow p-4 overflow-y-auto bg-gray-50">
+            <div id="message-list" class="space-y-3">
+                <div class="system-message flex">
+                    <div class="chat-bubble text-sm">
+                        Welcome! Create emoji posts to unlock new emojis. Start with ❤️😆😮😥😡👍. Good luck!
+                        <button id="show-instructions-button" class="ml-2 text-xs underline text-blue-500">(Show Full Instructions)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="current-post-display" class="p-3 border-t bg-gray-100 text-2xl min-h-[50px] text-center break-all"></div>
+
+        <div id="input-controls" class="p-3 border-t bg-gray-200 flex items-center gap-2">
+            <button id="backspace-button" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-lg">⌫</button>
+            <div class="flex-grow text-center">
+                 <button id="send-button" class="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 font-semibold text-lg">Send</button>
+            </div>
+            <button id="toggle-unlocked-view-button" class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 text-lg">📖</button>
+        </div>
+
+        <div id="emoji-palette-container" class="border-t bg-gray-50 p-1">
+            <p class="text-xs text-center text-gray-500 mb-1">Your Emoji Palette (Tap to add to post)</p>
+            <div id="emoji-palette" class="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-1 p-2 max-h-32 overflow-y-auto justify-items-center">
+                </div>
+        </div>
+    </div>
+
+    <div id="unlocked-emojis-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-xl w-full max-w-xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-xl font-semibold">All Discoverable Emojis</h2>
+                <button id="close-unlocked-view-button" class="text-2xl font-bold text-gray-600 hover:text-black">&times;</button>
+            </div>
+            <div id="unlocked-emojis-grid-container" class="flex-grow overflow-y-auto">
+                <div id="unlocked-emojis-grid" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2 text-2xl text-center">
+                    </div>
+            </div>
+             <p class="text-xs text-center text-gray-500 mt-2">Emojis in full color are discovered. Greyed out ones are yet to be found.</p>
+        </div>
+    </div>
+
+    <div id="instructions-modal" class="modal">
+        <div class="modal-content">
+            <span id="close-instructions-button" class="modal-close-button">&times;</span>
+            <h2 class="text-xl font-bold mb-3">How to Play Emoticonundrum</h2>
+            <div class="text-left space-y-2 text-sm">
+                <p>🕵️‍♂️ Your goal: Discover all hidden emojis!</p>
+                <p>🤔 How:</p>
+                <ol class="list-decimal list-inside ml-4 space-y-1">
+                    <li>Craft "posts" by selecting emojis from your palette.</li>
+                    <li>Hit "Send" to see the reaction.</li>
+                    <li>New emojis received as reactions are unlocked and added to your palette.</li>
+                    <li>If your post doesn't match any rule, you'll get 😵‍💫.</li>
+                </ol>
+                <p>💡 Tips:</p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li>Experiment with different combinations and lengths.</li>
+                    <li>Pay attention to the emojis you unlock – they are clues!</li>
+                    <li>Click 📖 to see all possible emojis and your progress.</li>
+                </ul>
+                <p>✨ Starting Emojis: ❤️ 😆 😮 😥 😡 👍</p>
+                <p>Good luck, and have fun decoding!</p>
+            </div>
+             <button id="instructions-modal-ok-button" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Got it!</button>
+        </div>
+    </div>
+
+    <div id="win-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold mb-3 text-green-500">🎉 Congratulations! 🎉</h2>
+            <p class="text-lg mb-2">You've discovered all <span id="win-modal-total-emojis"></span> emojis!</p>
+            <p class="mb-4">You are a true Emoticonundrum Master! 🏆</p>
+            <button id="play-again-button" class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // Full CSV data provided by the user
+        const csvData = `
+Output Emoji,Output Name (Suggested),Category,Input Emojis,Notes
+0️⃣,Keycap 0,Symbols & Signs,💯👍,Unlocks with 100 (part 1)
+1️⃣,Keycap 1,Symbols & Signs,💯👍,Unlocks with 100 (part 2)
+2️⃣,Keycap 2,Symbols & Signs,💯👍,Unlocks with 100 (part 3)
+3️⃣,Keycap 3,Symbols & Signs,💯👍,Unlocks with 100 (part 4)
+4️⃣,Keycap 4,Symbols & Signs,💯👍,Unlocks with 100 (part 5)
+5️⃣,Keycap 5,Symbols & Signs,💯👍,Unlocks with 100 (part 6)
+6️⃣,Keycap 6,Symbols & Signs,💯👍,Unlocks with 100 (part 7)
+7️⃣,Keycap 7,Symbols & Signs,💯👍,Unlocks with 100 (part 8)
+8️⃣,Keycap 8,Symbols & Signs,💯👍,Unlocks with 100 (part 9)
+9️⃣,Keycap 9,Symbols & Signs,💯👍,Unlocks with 100 (part 10)
+☀️,Sun,Animals & Nature,🔥😮,Fire in the sky (Surprising and bright)
+☕,Hot Beverage (Coffee/Tea),Food & Drink,💧🔥,Hot drink
+☘️,Shamrock,Symbols & Signs,🌿💚,Lucky green plant (green heart unlocked later)
+♾️,Infinity,Symbols & Signs,💯💯,Numbers going on forever
+⚰️,Coffin,Activities & Objects,💀😥,Container for the deceased
+⚱️,Funeral Urn,Activities & Objects,⚰️🔥,Ashes after cremation
+⛰️,Mountain,Travel & Places,🌍😮,Large surprising feature of Earth
+✂️,Scissors,Activities & Objects,📄😡,Cutting paper angrily (or with precision)
+✉️,Envelope,Activities & Objects,📜👍,For sending a message
+✍️,Writing Hand,Gestures,👍💡,Good idea to write down
+✒️,Black Nib,Activities & Objects,🖋️🖤,Writing tool (fountain pen unlocked later)
+✖️,Multiply/Cross Mark,Symbols & Signs,➕➕,Repeated addition
+✨,Sparkles,Symbols & Signs,⭐⭐,Extra sparkly
+❓,Question Mark,Symbols & Signs,😮🤔,Surprised and thinking leads to a question
+❗,Exclamation Mark,Symbols & Signs,😮👍,Emphatic statement
+❤️‍🩹,Mending Heart,Symbols & Signs,💔👍,Healing a broken heart
+➕,Plus,Symbols & Signs,1️⃣1️⃣,Addition
+➖,Minus,Symbols & Signs,1️⃣😥,Subtraction (taking away makes sad)
+➗,Divide,Symbols & Signs,🍕🧑‍🤝‍🧑,Sharing pizza (people holding hands unlocked later)
+⭐,Star,Animals & Nature,🌙✨,Celestial body that sparkles (sparkles unlocked later)
+〰️,Wavy Dash,Symbols & Signs,🌊💨,Represents waves or flowing movement
+🌈,Rainbow,Animals & Nature,☀️💧,Sun + Water = Rainbow
+🌊,Water Wave (Ocean),Animals & Nature,🌍💧,Earth's waters
+🌋,Volcano,Travel & Places,⛰️🔥,Mountain with fire
+🌍,Earth Globe Europe-Africa,Travel & Places,💯😮,The whole world is amazing
+🌙,Crescent Moon,Animals & Nature,🌍😴,Earth's companion at night (sleeping face unlocked later)
+🌭,Hot Dog,Food & Drink,🍞🥩,Sausage in a bun (meat as sausage placeholder)
+🌮,Taco,Food & Drink,🌽🥩,Meat in a corn tortilla (corn
+🌯,Burrito,Food & Drink,🌮🍚,Taco with rice (rice unlocked later)
+🌰,Chestnut,Food & Drink,🌳🔥,Nut often roasted on an open fire
+🌱,Seedling (Plant),Animals & Nature,👍💧,Approving new life/growth with water
+🌲,Evergreen Tree,Animals & Nature,🌳🥶,Tree that stays green in cold (cold face unlocked later)
+🌳,Deciduous Tree,Animals & Nature,🌱💧,Plant + Water = Tree
+🌵,Cactus,Animals & Nature,🌱☀️,Desert plant
+🌶️,Hot Pepper,Food & Drink,🔥😡,Spicy vegetable
+🌷,Tulip,Animals & Nature,🌱🩷,Plant with pink love
+🌷,Tulip,Animals & Nature,🌱❤️,Common garden flower
+🌸,Cherry Blossom,Animals & Nature,🌳🩷,Flowering tree
+🌹,Rose,Animals & Nature,🌷💔,Flower often associated with romance (and thorns/pain)
+🌺,Hibiscus,Animals & Nature,🌷☀️,Tropical flower
+🌻,Sunflower,Animals & Nature,🌷☀️,Flower that follows the sun
+🌼,Blossom,Animals & Nature,🌷😊,Simple
+🌽,Ear of Corn,Food & Drink,🌾💛,Yellow grain vegetable
+🌾,Sheaf of Rice,Food & Drink,🌱☀️,Grain plant grown in sun
+🌿,Herb,Animals & Nature,🌱👍,Useful plant
+🍀,Four Leaf Clover,Symbols & Signs,☘️⭐,Extra lucky shamrock
+🍁,Maple Leaf,Animals & Nature,🌳❤️,Iconic leaf
+🍄,Mushroom,Animals & Nature,🌳💧,Fungus that grows in damp places near trees
+🍅,Tomato,Food & Drink,🍓😡,"Fruit or vegetable? Often debated, red."
+🍆,Eggplant,Food & Drink,💜🌱,Purple vegetable (purple heart unlocked later)
+🍇,Grapes,Food & Drink,🌱💜,Plant with purple love (for wine/juice)
+🍈,Melon,Food & Drink,🍇☀️,Large
+🍉,Watermelon,Food & Drink,🍈💧,Melon with lots of water
+🍊,Tangerine/Orange,Food & Drink,🍈☀️,Citrus fruit
+🍋,Lemon,Food & Drink,🍊😥,Sour citrus fruit
+🍌,Banana,Food & Drink,🐒💛,Fruit monkeys like (yellow heart unlocked later)
+🍍,Pineapple,Food & Drink,🌳⭐,Tropical fruit with a crown
+🍎,Red Apple,Food & Drink,🌳❤️,Common fruit from a tree
+🍏,Green Apple,Food & Drink,🍎💚,Different color apple (green heart unlocked later)
+🍐,Pear,Food & Drink,🍎💧,Fruit with a teardrop shape
+🍑,Peach,Food & Drink,🍎🥰,Soft
+🍒,Cherries,Food & Drink,🍑❤️,Small
+🍓,Strawberry,Food & Drink,❤️🌱,Sweet red fruit from a plant
+🍔,Hamburger,Food & Drink,🍞🥩,Burger patty in a bun (bread
+🍕,Pizza,Food & Drink,🧀🍅,Cheese and tomato on dough (tomato unlocked later)
+🍖,Meat on Bone,Food & Drink,🦴🔥,Cooked meat
+🍗,Poultry Leg,Food & Drink,🐔🔥,Cooked chicken leg
+🍘,Rice Cracker,Food & Drink,🍚🔥,Cooked rice snack
+🍙,Rice Ball,Food & Drink,🍚👍,Japanese rice snack
+🍚,Cooked Rice,Food & Drink,🌾💧,Grain cooked in water
+🍜,Steaming Bowl (Ramen),Food & Drink,🍚🥚,Noodle soup with egg
+🍝,Spaghetti,Food & Drink,🍜🍅,Pasta with tomato sauce
+🍞,Bread,Food & Drink,🌾🔥,Baked grain
+🍟,French Fries,Food & Drink,🥔🔥,Fried potatoes (potato unlocked later)
+🍠,Roasted Sweet Potato,Food & Drink,🥔🔥,Sweet version of potato
+🍡,Dango,Food & Drink,🍚🩷,Japanese sweet dumpling
+🍢,Oden,Food & Drink,🍢👍,Japanese dish (placeholder for skewer)
+🍣,Sushi,Food & Drink,🍚🐟,Rice and raw fish (rice
+🍤,Fried Shrimp,Food & Drink,🦐🔥,Cooked shrimp
+🍥,Fish Cake with Swirl,Food & Drink,🐟🍥,Japanese fish cake
+🍦,Soft Ice Cream,Food & Drink,🥶🥛,Cold dairy treat
+🍧,Shaved Ice,Food & Drink,🥶💧,Frozen water treat
+🍨,Ice Cream,Food & Drink,🍦🥣,Ice cream in a bowl
+🍩,Doughnut,Food & Drink,🍞🍬,Sweet fried dough
+🍪,Cookie,Food & Drink,🍩👍,Baked sweet treat
+🍫,Chocolate Bar,Food & Drink,🤎🍬,Sweet brown treat (candy unlocked later)
+🍬,Candy,Food & Drink,😊✨,Sweet sparkly treat
+🍭,Lollipop,Food & Drink,🍬👍,Candy on a stick
+🍮,Custard,Food & Drink,🥚🥛,Sweet egg and milk dessert
+🍯,Honey Pot,Food & Drink,🐝💛,Sweet food from bees (bee
+🍰,Shortcake,Food & Drink,🎂🍓,Cake with strawberries
+🍱,Bento Box,Food & Drink,🍚🍣,Japanese meal box (sushi unlocked later)
+🍲,Pot of Food (Stew),Food & Drink,🥕🥔,Vegetable stew
+🍳,Cooking (Fried Egg),Food & Drink,🥚🔥,Egg cooked with fire
+🍵,Teacup Without Handle,Food & Drink,☕🌿,Tea
+🍶,Sake,Food & Drink,🍚💧,Japanese rice wine
+🍷,Wine Glass,Food & Drink,🍇💧,Drink made from grapes
+🍸,Cocktail Glass,Food & Drink,🍷🍋,Mixed alcoholic drink
+🍹,Tropical Drink,Food & Drink,🍸🍍,Fruity cocktail
+🍺,Beer Mug,Food & Drink,🌾💧,Drink made from grains
+🍻,Clinking Beer Mugs,Food & Drink,🍺🍺,Cheers with beer
+🍼,Baby Bottle,Activities & Objects,👶🥛,Milk for a baby (baby unlocked later)
+🍾,Bottle with Popping Cork,Food & Drink,🥳💧,Celebratory drink
+🍿,Popcorn,Food & Drink,🌽🔥,Corn heated up
+🎁,Wrapped Gift,Activities & Objects,🎉❤️,A loving surprise
+🎂,Birthday Cake,Food & Drink,🥳🕯️,Celebration cake with candle (candle unlocked later)
+🎃,Jack-O-Lantern,Activities & Objects,👻🔥,Spooky pumpkin with a light
+🎄,Christmas Tree,Activities & Objects,🌳⭐,Decorated tree for celebration
+🎈,Balloon,Activities & Objects,🎉💨,Party item filled with air
+🎉,Party Popper,Activities & Objects,🥳🙌,Ultimate party celebration
+🎌,Crossed Flags,Symbols & Signs,🇯🇵👍,Japanese celebration (Japan flag unlocked later)
+🎤,Microphone,Activities & Objects,🗣️👍,Tool for speaking/singing
+🎥,Movie Camera,Activities & Objects,🎬💡,Tool for filming movies
+🎧,Headphones,Activities & Objects,👂🎶,For listening to music
+🎨,Artist Palette,Activities & Objects,🌈👍,Tool for using many colors
+🎬,Clapper Board,Activities & Objects,🎥👍,Used when making movies
+🎮,Video Game,Activities & Objects,💻🥳,Fun on the computer
+🎵,Musical Note,Activities & Objects,🗣️❤️,Singing with love
+🎶,Musical Notes,Activities & Objects,🎵🎵,Multiple notes (musical note unlocked later)
+🎷,Saxophone,Activities & Objects,🎶💛,Jazzy instrument
+🎸,Guitar,Activities & Objects,🎶💪,Rock instrument
+🎹,Musical Keyboard,Activities & Objects,🎶💯,Instrument with many keys
+🎺,Trumpet,Activities & Objects,🎶🥳,Brass instrument for fanfares
+🎻,Violin,Activities & Objects,🎶😥,Instrument for melancholic tunes
+🏁,Chequered Flag,Symbols & Signs,🏎️👍,End of the race (racecar unlocked later)
+🏜️,Desert,Travel & Places,☀️🌵,Hot place with cacti (cactus unlocked later)
+🏝️,Desert Island,Travel & Places,🌊🌴,Island with a palm tree (palm tree unlocked later)
+🏞️,National Park,Travel & Places,🌳🌳,Many trees make a park/forest
+🏠,House,Travel & Places,🌳👍,A good place to live
+🏡,House with Garden,Travel & Places,🏠🌱,House with plants
+🏢,Office Building,Travel & Places,🏠💼,Building for work (briefcase unlocked later)
+🏥,Hospital,Travel & Places,🏠😥,Place you go when sick/sad
+🏦,Bank,Travel & Places,🏠💰,Place to store money
+🏨,Hotel,Travel & Places,🏠😴,Place to sleep when traveling
+🏭,Factory,Travel & Places,🏢💨,Building that produces smoke
+🏰,Castle,Travel & Places,👑🏠,Royal house
+🏳️,White Flag,Symbols & Signs,😥🤍,Surrender or peace
+🏳️‍⚧️,Transgender Flag,Symbols & Signs,🩷🤍,Trans pride (uses pink and white hearts)
+🏳️‍🌈,Rainbow Flag,Symbols & Signs,🌈❤️,Pride flag
+🏴,Black Flag,Symbols & Signs,😡🖤,Anarchy or rebellion
+🏴‍☠️,Pirate Flag,Fantasy & Concepts,💀🌊,Skull and crossbones for sea robbers
+🐀,Rat,Animals & Nature,🐁😡,Larger
+🐁,Mouse,Animals & Nature,🐾🧀,Small animal that likes cheese (alt to face)
+🐂,Ox,Animals & Nature,🐮💪,Strong working bovine
+🐃,Water Buffalo,Animals & Nature,🐮💧,Bovine found near water
+🐄,Cow,Animals & Nature,🌱🥛,Animal that eats grass and gives milk (milk unlocked later)
+🐅,Tiger,Animals & Nature,🐱縞,Striped big cat (using Kanji for stripe as a placeholder concept)
+🐆,Leopard,Animals & Nature,🐱🐾,Spotted big cat
+🐇,Rabbit,Animals & Nature,🐾🌱,Animal that eats plants (alt to face)
+🐈,Cat,Animals & Nature,🐾🌙,Nocturnal companion (alt to face)
+🐊,Crocodile,Animals & Nature,🌊😡,Large reptile predator in water
+🐌,Snail,Animals & Nature,🐛💧,Slow
+🐍,Snake,Animals & Nature,🌱😡,Slithering reptile
+🐎,Horse,Animals & Nature,🌱💨,Animal that eats grass and runs fast (alt to face)
+🐐,Goat,Animals & Nature,⛰️🌱,Mountain-dwelling plant eater
+🐑,Sheep,Animals & Nature,🌱☁️,Fluffy animal that eats grass (cloud unlocked later)
+🐒,Monkey,Animals & Nature,🌳😆,Playful animal in trees
+🐓,Rooster,Animals & Nature,🐔☀️,Male chicken
+🐔,Chicken,Animals & Nature,🌱🥚,Bird that eats seeds and lays eggs (egg unlocked later)
+🐕,Dog,Animals & Nature,🐾❤️,Loyal companion (alt to face)
+🐖,Pig,Animals & Nature,泥😊,Animal that likes mud (alt to face)
+🐗,Boar,Animals & Nature,🐷🌳,Wild pig from the forest
+🐘,Elephant,Animals & Nature,🌍👃,Large land animal with a trunk (nose)
+🐙,Octopus,Animals & Nature,🌊🧠,Intelligent sea creature with many arms
+🐛,Bug,Animals & Nature,🌱😮,Small creature found on plants
+🐜,Ant,Animals & Nature,🐛👍,Hard-working small insect
+🐝,Honeybee,Animals & Nature,🌱🌻,Insect that collects pollen from flowers (sunflower unlocked later)
+🐞,Lady Beetle,Animals & Nature,🐛❤️,A well-liked bug
+🐟,Fish,Animals & Nature,🌊👍,Common sea creature
+🐠,Tropical Fish,Animals & Nature,🌊❤️,Colorful
+🐡,Blowfish,Animals & Nature,🌊😮,Fish that puffs up when surprised
+🐢,Turtle,Animals & Nature,💧🌍,Slow animal
+🐦,Bird,Animals & Nature,💨🌱,Creature that flies and nests in plants
+🐧,Penguin,Animals & Nature,💧🥶,Bird that lives in cold
+🐨,Koala,Animals & Nature,🐻🌳,Bear-like animal that lives in trees
+🐩,Poodle,Animals & Nature,🐕💅,Fancy dog (nail polish unlocked later)
+🐪,Camel (one hump),Animals & Nature,🌍☀️,Desert animal
+🐫,Camel (two humps),Animals & Nature,🐪🐪,More humps
+🐬,Dolphin,Animals & Nature,🌊😆,Playful
+🐭,Mouse Face,Animals & Nature,🐾🧀,Small animal that likes cheese (cheese unlocked later)
+🐮,Cow Face,Animals & Nature,🌱🥛,Animal that eats grass and gives milk (milk unlocked later)
+🐯,Tiger Face,Animals & Nature,🐱😡,Fierce large cat
+🐰,Rabbit Face,Animals & Nature,🐾🌱,Animal that eats plants
+🐱,Cat Face,Animals & Nature,🐾🌙,Nocturnal companion
+🐳,Spouting Whale,Animals & Nature,🌊😮,Large sea mammal that spouts water
+🐴,Horse Face,Animals & Nature,🌱💨,Animal that eats grass and runs fast
+🐶,Dog Face,Animals & Nature,🐾❤️,Loyal companion
+🐷,Pig Face,Animals & Nature,泥😊,Animal that likes mud (mud unlocked later)
+🐸,Frog Face,Animals & Nature,💧🌱,Amphibian
+🐹,Hamster Face,Animals & Nature,🐭😊,Cute small pet
+🐺,Wolf Face,Animals & Nature,🐶🌙,Wild canine
+🐻,Bear Face,Animals & Nature,🐾🍯,Animal that loves honey (honey unlocked later)
+🐼,Panda Face,Animals & Nature,🐻🌱,Bear that eats bamboo (plant)
+🐾,Paw Prints,Animals & Nature,🌳👀,Animal tracks seen in nature
+🐿️,Chipmunk/Squirrel,Animals & Nature,🌳🌰,Small rodent that gathers nuts (chestnut unlocked later)
+👀,Eyes,Faces & Emotions,😮😮,Wide eyes of surprise (alt to single 😮)
+👂,Ear,Faces & Emotions,😮🗣️,Listening intently to speech
+👃,Nose,Faces & Emotions,😮😤,Part of a face
+👅,Tongue,Faces & Emotions,😆😋,Sticking tongue out playfully (face savoring food unlocked later)
+👌,OK Hand,Gestures,😮👍,Surprised
+👑,Crown,Activities & Objects,⭐💛,Royal golden item
+👻,Ghost,Fantasy & Concepts,💀💨,Spirit from remains
+👽,Alien,Fantasy & Concepts,🌍⭐,From Earth to the stars (visitor)
+💀,Skull,Faces & Emotions,🦴😥,Bone + sadness = skull (death)
+💄,Lipstick,Activities & Objects,💋❤️,For lovely lips (kiss mark unlocked later)
+💋,Kiss Mark,Symbols & Signs,😘💄,Mark left by a kiss with lipstick
+💌,Love Letter,Symbols & Signs,❤️✉️,A letter full of love (envelope unlocked later)
+💍,Ring,Activities & Objects,💎❤️,Precious gift of love
+💎,Gem Stone,Activities & Objects,⭐🌍,Precious stone from the earth
+💐,Bouquet,Symbols & Signs,🌹🌷,Collection of flowers (rose
+💔,Broken Heart,Symbols & Signs,❤️😡,Love and anger/pain lead to heartbreak
+💚,Green Heart,Symbols & Signs,❤️🌱,Love for nature/plants
+💛,Yellow Heart,Symbols & Signs,❤️☀️,Love for sunshine/happiness
+💜,Purple Heart,Symbols & Signs,❤️✨,Love for magic/mystery (sparkles unlocked later)
+💡,Light Bulb,Activities & Objects,🤯👍,Mind blown leads to a bright idea
+💣,Bomb,Activities & Objects,🔥😡,Explosive anger
+💧,Droplet (Water),Animals & Nature,😥😮,Tears or sweat from emotion
+💨,Dash (Air/Wind),Animals & Nature,😮😮,Exhaling air in great surprise (alt to single 😮)
+💪,Flexed Biceps,Gestures,😡👍,Strength from determination/approval
+💬,Speech Bubble,Symbols & Signs,😊🗣️,Happy to chat (speaking head unlocked later)
+💯,Hundred Points,Symbols & Signs,👍👍👍,
+💰,Money Bag,Activities & Objects,🤑👍,Lots of money (money mouth face unlocked later)
+💻,Laptop,Activities & Objects,📱💼,Portable computer for work
+💾,Floppy Disk,Activities & Objects,💻😥,Old way to save data (sad it's obsolete)
+💿,Optical Disk,Activities & Objects,💾✨,Shiny new way to save data
+📀,DVD,Activities & Objects,💿🎬,Disk for movies (clapper board unlocked later)
+📅,Calendar,Activities & Objects,☀️🌙,Tracking days and nights
+📆,Tear-off Calendar,Activities & Objects,📅😥,Days passing by (sadly)
+📈,Chart Increasing,Symbols & Signs,💰👍,Money going up
+📉,Chart Decreasing,Symbols & Signs,💰😥,Money going down
+📊,Bar Chart,Symbols & Signs,📈📉,Comparing data
+📌,Pushpin,Activities & Objects,📍👍,To pin something (round pushpin is same)
+📍,Round Pushpin,Travel & Places,🗺️📌,Mark a location on a map (world map unlocked later)
+📎,Paperclips,Activities & Objects,🖇️🖇️,More paperclips
+📖,Open Book,Activities & Objects,💡🌍,Knowledge of the world
+📚,Books,Activities & Objects,📖📖,Many books
+📜,Scroll,Activities & Objects,📖😥,Ancient
+📦,Package,Activities & Objects,✉️🎁,A gift sent by mail
+📧,E-mail,Activities & Objects,✉️💻,Electronic mail
+📮,Postbox,Activities & Objects,✉️🏠,Place to send letters from home
+📰,Newspaper,Activities & Objects,🌍🗣️,News from around the world
+📱,Mobile Phone,Activities & Objects,🗣️💡,Device for communication and ideas
+📷,Camera,Activities & Objects,👀💡,Tool for capturing images
+📺,Television,Activities & Objects,🏠🎬,Watch movies at home
+🔑,Key,Activities & Objects,🔒💡,The idea to open a lock (lock unlocked later)
+🔒,Lock,Activities & Objects,🔑❓,Key for an unknown lock
+🔟,Keycap Ten,Symbols & Signs,💯👍,Unlocks with 100 (part 11)
+🔥,Fire,Animals & Nature,😡😡,Intense anger is like fire (already exists
+🔪,Kitchen Knife,Activities & Objects,🥩👍,Tool for cutting meat
+🔫,Pistol,Activities & Objects,😡🔥,Dangerous weapon (metaphorical 'shooting hot anger')
+🕊️,Dove,Symbols & Signs,🐦❤️,Bird symbolizing peace and love
+🕷️,Spider,Animals & Nature,🐛🕸️,Bug that spins webs (web unlocked later)
+🕹️,Joystick,Activities & Objects,🎮👍,Game controller (game controller unlocked later)
+🖇️,Paperclip,Activities & Objects,📄👍,Holds papers together (page facing up unlocked later)
+🖋️,Fountain Pen,Activities & Objects,✍️💧,Pen that uses ink (writing hand
+🖌️,Paintbrush,Activities & Objects,🎨🪵,Tool for painting (wood for handle)
+🖍️,Crayon,Activities & Objects,🎨😊,Simple coloring tool for fun
+🖤,Black Heart,Symbols & Signs,💔😥,Deep sorrow
+🖥️,Desktop Computer,Activities & Objects,💻🏠,Computer for home/office
+🖼️,Framed Picture,Activities & Objects,📷❤️,A loved photo in a frame
+🗑️,Wastebasket,Activities & Objects,📄😥,Throwing away sad paper/mistakes
+🗞️,Rolled-up Newspaper,Activities & Objects,📰👍,Newspaper ready for delivery/reading
+🗣️,Speaking Head,Faces & Emotions,😮💬,Surprised by speech (speech bubble unlocked by this)
+🗿,Moyai,Travel & Places,⛰️😮,Mysterious stone statue
+😂,Face with Tears of Joy,Faces & Emotions,😆😭,Laughing so hard you cry
+😅,Grinning Face with Sweat,Faces & Emotions,😆😥,Laughing through sadness or awkwardness
+😈,Smiling Face with Horns,Fantasy & Concepts,😆😡,Mischievous laughter and anger
+😊,Smiling Face with Smiling Eyes,Faces & Emotions,❤️👍,Positive and loving approval
+😊,Smiling Face with Smiling Eyes,Faces & Emotions,😆🙏,Joyful gratitude (Alternative)
+😍,Smiling Face with Heart-Eyes,Faces & Emotions,❤️❤️,Increased affection
+😏,Smirking Face,Faces & Emotions,❤️😆,Playful love and laughter
+😒,Unamused Face,Faces & Emotions,😥😡,Sadness and anger leading to disapproval
+😘,Kissing Face,Faces & Emotions,❤️😊,Love and a smile lead to a kiss
+😤,Face with Steam from Nose,Faces & Emotions,😮😡,Surprise and anger
+😨,Fearful Face,Faces & Emotions,😮😥,Surprise and sadness leading to fear
+😭,Loudly Crying Face,Faces & Emotions,😥😥,Intense sadness
+😲,Astonished Face,Faces & Emotions,😆😮,Laughter and surprise combined
+😴,Sleeping Face,Faces & Emotions,😥🌙,Tired at night
+🙌,Raising Hands,Gestures,👍👍,Strong agreement
+🙏,Folded Hands,Gestures,😥👍,Seeking comfort/help
+🚩,Triangular Flag,Symbols & Signs,⛳👍,Marker flag (flag in hole unlocked later)
+🛡️,Shield,Activities & Objects,💪👍,Strong defense
+🤍,White Heart,Symbols & Signs,❤️🙏,Love for peace/purity
+🤎,Brown Heart,Symbols & Signs,❤️🌍,Love for earth/stability
+🤏,Pinching Hand,Gestures,👍➖,Thumbs up for something small
+🤔,Thinking Face,Faces & Emotions,🧠❓,Brainpower + Question (Question mark unlocked later)
+🤖,Robot,Fantasy & Concepts,💡💪,Intelligent and strong machine
+🤗,Hugging Face,Faces & Emotions,😊🥰,Gentle happiness and love combine into a hug
+🤠,Cowboy Hat Face,People & Fantasy,😊🐴,Happy person with a horse (horse unlocked later)
+🤡,Clown Face,Fantasy & Concepts,🥳😥,Party face but also sad (classic clown)
+🤣,Rolling on the Floor Laughing,Faces & Emotions,😆😆,Intense laughter
+🤤,Drooling Face,Faces & Emotions,😋💧,Savoring food so much you drool
+🤥,Lying Face,Faces & Emotions,👃➖,Growing nose (minus sign for 'less truth')
+🤩,Star-Struck,Faces & Emotions,❤️😮,Amazed by something loved
+🤪,Zany Face,Faces & Emotions,😆🤯,Laughing your mind out
+🤫,Shushing Face,Faces & Emotions,😮🤐,Surprised into silence (Zipper mouth unlocked later)
+🤬,Face with Symbols on Mouth,Faces & Emotions,😡😡,Intense anger
+🤯,Exploding Head,Faces & Emotions,😮😮,Mind blown by surprise
+🥀,Wilted Flower,Animals & Nature,🌹😥,Dying flower
+🥁,Drum,Activities & Objects,🎶😡,Percussion instrument
+🥂,Clinking Glasses,Food & Drink,🍾🍾,Cheers with champagne
+🥃,Tumbler Glass (Whiskey),Food & Drink,🔥💧,Strong alcoholic drink
+🥐,Croissant,Food & Drink,🍞🌙,Crescent-shaped pastry
+🥑,Avocado,Food & Drink,🌳💚,Green fruit with a large pit
+🥒,Cucumber,Food & Drink,💧💚,Cool green vegetable
+🥓,Bacon,Food & Drink,🐷🔥,Cooked pork (pig unlocked later)
+🥔,Potato,Food & Drink,🌍🌱,Root vegetable
+🥕,Carrot,Food & Drink,🐰🧡,Vegetable rabbits like (orange heart unlocked later)
+🥖,Baguette Bread,Food & Drink,🍞👍,Long French bread
+🥗,Green Salad,Food & Drink,🥬🍅,Mixed greens and tomato
+🥘,Shallow Pan of Food (Paella),Food & Drink,🍚🦐,Rice dish with seafood
+🥙,Stuffed Flatbread,Food & Drink,🍞🥗,Bread with salad (salad unlocked later)
+🥚,Egg,Food & Drink,🐔😮,Comes from a chicken
+🥛,Glass of Milk,Food & Drink,🐮👍,Drink from a cow
+🥜,Peanuts,Food & Drink,🐘🌍,Food elephants like
+🥝,Kiwifruit,Food & Drink,🍓💚,Fuzzy brown fruit
+🥞,Pancakes,Food & Drink,🍳🥛,Breakfast food (egg
+🥟,Dumpling,Food & Drink,🥡👍,Chinese food (takeout box unlocked later)
+🥡,Takeout Box,Food & Drink,🥡👍,Container for Chinese food
+🥣,Bowl with Spoon,Food & Drink,🍲👍,Ready to eat from a bowl
+🥤,Cup with Straw,Food & Drink,💧👍,Drink container
+🥥,Coconut,Food & Drink,🌴💧,Tropical fruit with water inside (palm tree unlocked later)
+🥦,Broccoli,Food & Drink,🌳💚,Tree-like green vegetable
+🥧,Pie,Food & Drink,🍎🔥,Baked fruit dish
+🥨,Pretzel,Food & Drink,🥖❤️,Twisted salty bread
+🥩,Cut of Meat,Food & Drink,🐮🔥,Cooked beef/steak
+🥪,Sandwich,Food & Drink,🍞🥬,Greens between bread
+🥫,Canned Food,Food & Drink,🥫👍,Food in a can (placeholder for can itself)
+🥬,Leafy Green,Food & Drink,🌱💚,Salad green
+🥭,Mango,Food & Drink,🍍☀️,Sweet tropical fruit
+🥯,Bagel,Food & Drink,🍞😮,Bread with a hole
+🥰,Smiling Face with Hearts,Faces & Emotions,😍❤️,Overwhelming affection (alt: ❤️
+🥳,Partying Face,Faces & Emotions,😆👍,Joyful approval
+🥴,Woozy Face,Faces & Emotions,😵😥,Dizzy and unwell (dizzy face unlocked later)
+🥶,Cold Face,Faces & Emotions,😥🧊,Sad and freezing (ice unlocked later)
+🥺,Pleading Face,Faces & Emotions,❤️😥,Pleading for affection or comfort
+🦀,Crab,Food & Drink,🌊👍,Sea creature that walks sideways
+🦁,Lion Face,Animals & Nature,🐯☀️,King of the jungle (sun = kingly)
+🦂,Scorpion,Animals & Nature,🕷️😡,Dangerous arachnid
+🦃,Turkey,Food & Drink,🐔🥳,Bird often eaten at celebrations
+🦄,Unicorn Face,Fantasy & Concepts,🐴⭐,Magical horse
+🦇,Bat,Animals & Nature,🐦🌙,Nocturnal flying mammal (alternative)
+🦈,Shark,Animals & Nature,🌊😡,Fearsome predator of the sea
+🦉,Owl,Animals & Nature,🐦🌙,Nocturnal bird
+🦊,Fox Face,Animals & Nature,🐾🌳,Sly animal of the forest
+🦋,Butterfly,Animals & Nature,🐛💨,Bug that transforms and flies
+🦌,Deer,Animals & Nature,🌳🐾,Forest animal with antlers
+🦍,Gorilla,Animals & Nature,🐒😡,Large
+🦎,Lizard,Animals & Nature,🐍☀️,Reptile that basks in the sun
+🦏,Rhinoceros,Animals & Nature,🌍😡,Large horned land animal
+🦐,Shrimp,Food & Drink,🌊🤏,Small sea creature (pinching hand unlocked later)
+🦑,Squid,Animals & Nature,🌊💨,Sea creature that propels itself
+🦒,Giraffe,Animals & Nature,🌳😮,Tall animal that eats from tall trees
+🦓,Zebra,Animals & Nature,🐴縞,Striped horse-like animal
+🦕,Sauropod,Fantasy & Concepts,🦎🌳,Large
+🦖,T-Rex,Fantasy & Concepts,🦎😡,Large
+🦗,Cricket,Animals & Nature,🐛🌙,Insect heard at night
+🦘,Kangaroo,Animals & Nature,🌍💨,Hopping animal from Australia
+🦚,Peacock,Animals & Nature,🐦🤩,Bird with stunning feathers
+🦛,Hippopotamus,Animals & Nature,🌍💧,Large land/water animal
+🦜,Parrot,Animals & Nature,🐦💬,Bird that can talk
+🦝,Raccoon,Animals & Nature,🐾🗑️,Nocturnal animal known for going through trash (trash can unlocked later)
+🦞,Lobster,Food & Drink,🦐😡,Larger
+🦡,Badger,Animals & Nature,🐾😡,Tenacious burrowing animal
+🦢,Swan,Animals & Nature,🐦❤️,Graceful
+🦤,Dodo,Animals & Nature,🐦💀,Extinct bird
+🦥,Sloth,Animals & Nature,🌳😴,Slow-moving tree dweller (sleeping face unlocked later)
+🦦,Otter,Animals & Nature,🌊😆,Playful water mammal
+🦧,Orangutan,Animals & Nature,🐒🌳,Tree-dwelling ape
+🦨,Skunk,Animals & Nature,🐾💨,Animal known for its smelly spray
+🦩,Flamingo,Animals & Nature,🐦🦐,Pink bird that eats shrimp
+🦬,Bison,Animals & Nature,🐮🌍,Large bovine from plains
+🦮,Guide Dog,Animals & Nature,🐕🦯,Dog that helps people (probing cane unlocked later)
+🦴,Bone,Animals & Nature,😥💀,Sad remains (skull unlocked later)
+🧀,Cheese,Food & Drink,🥛🌙,Milk aged under the moon (creative logic)
+🧁,Cupcake,Food & Drink,🍰😊,Small individual cake
+🧂,Salt,Food & Drink,🌊☀️,Evaporated sea water
+🧄,Garlic,Food & Drink,💡😡,Strong-flavored bulb
+🧅,Onion,Food & Drink,😭🌱,Vegetable that makes you cry
+🧆,Falafel,Food & Drink,🌱🔥,Fried chickpea balls
+🧇,Waffle,Food & Drink,🥞🥅,Pancakes with a grid pattern (goal net for grid)
+🧈,Butter,Food & Drink,🥛👍,Dairy product from milk
+🧋,Bubble Tea,Food & Drink,🥤⚫,Tea with tapioca pearls (black circle for pearls)
+🧠,Brain,Faces & Emotions,🤯💡,Exploding head + idea = brain power
+🧡,Orange Heart,Symbols & Signs,❤️🔥,Love for warmth/passion
+🧸,Teddy Bear,Activities & Objects,🐻❤️,Lovable bear toy (bear unlocked later)
+🩷,Pink Heart,Symbols & Signs,❤️😊,Sweet
+🪴,Potted Plant,Animals & Nature,🌱🏺,Plant in a pot (amphora/pot unlocked later)
+🪵,Wood,Animals & Nature,🌳🔥,Tree processed by fire/cutting
+`;
+
+        const initialPlayerEmojis = Object.freeze(['❤️', '😆', '😮', '😥', '😡', '👍']);
+        let currentPlayerEmojis = new Set(initialPlayerEmojis);
+        const reactionRules = {}; // Stores input sequences as keys and arrays of output emojis as values
+        let allPossibleOutputEmojis = new Set(); // All unique emojis that can be received as reactions
+        let discoveredEmojisByPlayer = new Set(initialPlayerEmojis); // Emojis player has unlocked (starts with initial)
+
+        let currentPostArray = []; // Array to hold emojis for the current post being built
+
+        // DOM Element References
+        const messageList = document.getElementById('message-list');
+        const currentPostDisplay = document.getElementById('current-post-display');
+        const emojiPalette = document.getElementById('emoji-palette');
+        const sendButton = document.getElementById('send-button');
+        const backspaceButton = document.getElementById('backspace-button');
+        const progressCounter = document.getElementById('progress-counter');
+        
+        const unlockedEmojisModal = document.getElementById('unlocked-emojis-modal');
+        const unlockedEmojisGrid = document.getElementById('unlocked-emojis-grid');
+        const toggleUnlockedViewButton = document.getElementById('toggle-unlocked-view-button');
+        const closeUnlockedViewButton = document.getElementById('close-unlocked-view-button');
+
+        const instructionsModal = document.getElementById('instructions-modal');
+        const showInstructionsButton = document.getElementById('show-instructions-button');
+        const closeInstructionsButton = document.getElementById('close-instructions-button');
+        const instructionsModalOkButton = document.getElementById('instructions-modal-ok-button');
+        
+        const winModal = document.getElementById('win-modal');
+        const winModalTotalEmojis = document.getElementById('win-modal-total-emojis');
+        const playAgainButton = document.getElementById('play-again-button');
+
+        /**
+         * Parses the CSV data string to populate reactionRules and allPossibleOutputEmojis.
+         * It expects the CSV to have a header row, and then rows with:
+         * Output Emoji, ..., Input Emojis, ...
+         * It specifically uses the first column for Output Emoji and the fourth for Input Emojis.
+         */
+        function parseCSVData() {
+            // Clear previous rules if any (for reset functionality)
+            for (const key in reactionRules) {
+                delete reactionRules[key];
+            }
+            allPossibleOutputEmojis.clear();
+
+            const lines = csvData.trim().split('\n');
+            if (lines.length <= 1) {
+                console.error("CSV data is empty or has only a header.");
+                return;
+            }
+            lines.shift(); // Remove header line: "Output Emoji,Output Unicode,Output Name,Category,Input Emojis,Input Unicodes,Notes"
+
+            lines.forEach(line => {
+                const parts = line.split(','); // Simple CSV split
+                // We need "Output Emoji" (index 0) and "Input Emojis" (index 3)
+                if (parts.length > 3) { 
+                    const outputEmoji = parts[0].trim();
+                    const inputSeq = parts[3].trim();
+
+                    if (inputSeq && outputEmoji) {
+                        allPossibleOutputEmojis.add(outputEmoji);
+                        
+                        // Normalize the entire raw input string from CSV first
+                        const normalizedCsvInputString = normalizeEmoji(inputSeq);
+                        
+                        // Create a canonical (sorted) key for the input sequence
+                        const emojisInSeq = Array.from(normalizedCsvInputString); // Correctly splits multi-byte Unicode chars
+                        emojisInSeq.sort(); // Sorts the emojis alphabetically/by Unicode
+                        const canonicalInputSeq = emojisInSeq.join('');
+
+                        if (!reactionRules[canonicalInputSeq]) {
+                            reactionRules[canonicalInputSeq] = [];
+                        }
+                        // Avoid adding duplicate output emojis for the same input sequence
+                        if (!reactionRules[canonicalInputSeq].includes(outputEmoji)) {
+                           reactionRules[canonicalInputSeq].push(outputEmoji);
+                        }
+                    } else {
+                        // console.warn("Skipping line due to missing input/output emoji:", line);
+                    }
+                } else {
+                    // console.warn("Skipping malformed CSV line:", line);
+                }
+            });
+            // Add initial emojis to the discovered set as they are "known" from the start
+            initialPlayerEmojis.forEach(emoji => discoveredEmojisByPlayer.add(emoji));
+        }
+
+        /**
+         * Renders the player's currently available emojis in the palette.
+         * Emojis are sorted for consistent display.
+         */
+        function renderEmojiPalette() {
+            emojiPalette.innerHTML = '';
+            const sortedPaletteEmojis = Array.from(currentPlayerEmojis).sort();
+            
+            sortedPaletteEmojis.forEach(emoji => {
+                const button = document.createElement('button');
+                button.textContent = emoji;
+                button.classList.add('emoji-button', 'text-2xl', 'p-1', 'rounded-md', 'hover:bg-gray-300', 'focus:outline-none', 'focus:ring-2', 'focus:ring-blue-400');
+                button.onclick = () => addEmojiToPost(emoji);
+                emojiPalette.appendChild(button);
+            });
+        }
+        
+        /**
+         * Updates the display of the current post being composed by the player.
+         */
+        function renderCurrentPostDisplay() {
+            currentPostDisplay.textContent = currentPostArray.join('');
+        }
+
+        /**
+         * Adds an emoji to the current post array and updates the display.
+         * @param {string} emoji - The emoji character to add.
+         */
+        function addEmojiToPost(emoji) {
+            currentPostArray.push(emoji);
+            renderCurrentPostDisplay();
+        }
+
+        /**
+         * Removes the last emoji from the current post array and updates the display.
+         */
+        function removeLastEmojiFromPost() {
+            if (currentPostArray.length > 0) {
+                currentPostArray.pop();
+                renderCurrentPostDisplay();
+            }
+        }
+
+        /**
+         * Adds a chat message to the message list in the UI.
+         * @param {string} sender - 'player' or 'system'.
+         * @param {string} emojiString - The emoji or text content of the message.
+         */
+        function addChatMessage(sender, emojiString) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('flex', sender === 'player' ? 'player-message' : 'system-message');
+            
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.classList.add('chat-bubble', 'text-xl');
+            bubbleDiv.textContent = emojiString;
+            
+            messageDiv.appendChild(bubbleDiv);
+            messageList.appendChild(messageDiv);
+            // Ensure the chat window scrolls to the latest message
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+
+        /**
+         * Updates the progress counter (discovered / total).
+         * Also re-renders the unlocked emojis grid to reflect any changes.
+         */
+        function updateProgress() {
+            // Filter allPossibleOutputEmojis to only include those that are *actually* outputs of rules
+            // This is to avoid counting emojis that might be in the initial set but not an output of any rule.
+            const trulyDiscoverableCount = Array.from(allPossibleOutputEmojis).filter(emoji => !initialPlayerEmojis.includes(emoji)).length;
+            const discoveredCount = Array.from(discoveredEmojisByPlayer).filter(emoji => !initialPlayerEmojis.includes(emoji)).length;
+            
+            // The total in progress should be all emojis that can be unlocked through rules.
+            // The discovered count should be how many of THOSE the player has found.
+            progressCounter.textContent = `Discovered: ${discoveredCount} / ${trulyDiscoverableCount}`;
+
+            renderUnlockedEmojisGrid(); // Update the visual grid of all emojis
+        }
+
+
+        /**
+         * Checks if the player has discovered all possible output emojis.
+         * If so, displays the win modal.
+         */
+        function checkWinCondition() {
+            // Consider "won" if all emojis that are *outputs* of rules have been discovered.
+            let allOutputsDiscovered = true;
+            if (allPossibleOutputEmojis.size === 0) { // No rules, no win possible
+                allOutputsDiscovered = false;
+            } else {
+                for (const emoji of allPossibleOutputEmojis) {
+                    if (!discoveredEmojisByPlayer.has(emoji)) {
+                        allOutputsDiscovered = false;
+                        break;
+                    }
+                }
+            }
+
+            if (allOutputsDiscovered) {
+                winModalTotalEmojis.textContent = allPossibleOutputEmojis.size;
+                winModal.style.display = 'flex';
+            }
+        }
+        
+        /**
+         * Normalizes an emoji string by removing common variation selectors (VS15, VS16).
+         * This helps in treating different Unicode representations of the same visual emoji consistently.
+         * @param {string} emojiStr - The emoji string to normalize.
+         * @returns {string} The normalized emoji string.
+         */
+        const normalizeEmoji = (emojiStr) => {
+            if (typeof emojiStr !== 'string') return '';
+            // Remove U+FE0E (VS15 - text presentation) and U+FE0F (VS16 - emoji presentation)
+            return emojiStr.replace(/[\uFE0E\uFE0F]/g, '');
+        };
+
+        /**
+         * Handles the logic when the player sends a post.
+         * It checks the post against reactionRules and updates the game state.
+         */
+        function handleSendPost() {
+            if (currentPostArray.length === 0) return;
+
+            const postString = currentPostArray.join('');
+            addChatMessage('player', postString);
+
+            // Normalize each emoji string in the player's current post array
+            const normalizedPlayerArray = currentPostArray.map(emojiUnit => normalizeEmoji(emojiUnit));
+            
+            // Sort the array of normalized emoji strings
+            normalizedPlayerArray.sort();
+            const canonicalPostString = normalizedPlayerArray.join('');
+
+            let reacted = false;
+            if (reactionRules[canonicalPostString]) {
+                const reactionEmojis = reactionRules[canonicalPostString]; // This is an array
+                reactionEmojis.forEach(reactionEmoji => {
+                    addChatMessage('system', reactionEmoji);
+                    // Add to player's usable emojis if it's new
+                    currentPlayerEmojis.add(reactionEmoji); 
+                    // Add to player's discovered set if it's a discoverable output emoji
+                    if (allPossibleOutputEmojis.has(reactionEmoji)) {
+                        discoveredEmojisByPlayer.add(reactionEmoji);
+                    }
+                });
+                reacted = true;
+                renderEmojiPalette(); // Update palette if new emojis were unlocked
+            }
+            
+            if (!reacted) {
+                addChatMessage('system', '😵‍💫'); // Confused emoji for no match
+            }
+
+            currentPostArray = []; // Clear the current post
+            renderCurrentPostDisplay();
+            updateProgress();
+            checkWinCondition();
+        }
+
+        /**
+         * Renders the grid of all discoverable emojis, marking locked/unlocked status.
+         * Emojis are sorted for consistent display.
+         */
+        function renderUnlockedEmojisGrid() {
+            unlockedEmojisGrid.innerHTML = '';
+            // Sort all discoverable emojis for a consistent display in the modal
+            const sortedAllDiscoverable = Array.from(allPossibleOutputEmojis).sort();
+
+            sortedAllDiscoverable.forEach(emoji => {
+                const item = document.createElement('div');
+                item.textContent = emoji;
+                item.classList.add('emoji-grid-item', 'p-1', 'rounded');
+                if (!discoveredEmojisByPlayer.has(emoji)) {
+                    item.classList.add('locked'); // Style for not-yet-discovered emojis
+                }
+                unlockedEmojisGrid.appendChild(item);
+            });
+        }
+
+        /**
+         * Toggles the visibility of the "Unlocked Emojis" modal.
+         * @param {boolean} show - True to show the modal, false to hide.
+         */
+        function toggleUnlockedView(show) {
+            unlockedEmojisModal.style.display = show ? 'flex' : 'none';
+            if (show) {
+                renderUnlockedEmojisGrid(); // Refresh grid content when shown
+            }
+        }
+        
+        /**
+         * Resets the game to its initial state.
+         */
+        function resetGame() {
+            currentPlayerEmojis = new Set(initialPlayerEmojis);
+            discoveredEmojisByPlayer = new Set(initialPlayerEmojis); // Reset to only initial emojis
+            currentPostArray = [];
+            
+            // Clear existing messages and add the initial reset message
+            messageList.innerHTML = `
+                <div class="system-message flex">
+                    <div class="chat-bubble text-sm">
+                        Game Reset! Create emoji posts to unlock new emojis. Start with ❤️😆😮😥😡👍. Good luck!
+                        <button id="show-instructions-button-reset" class="ml-2 text-xs underline text-blue-500">(Show Full Instructions)</button>
+                    </div>
+                </div>`;
+            
+            // Re-attach listener for the new instructions button after clearing messageList
+            const newShowInstructionsButton = document.getElementById('show-instructions-button-reset');
+            if(newShowInstructionsButton) {
+                newShowInstructionsButton.onclick = () => instructionsModal.style.display = 'flex';
+            } else {
+                // Fallback if the original button in the header is still the one to use
+                 const originalShowInstructionsButton = document.getElementById('show-instructions-button');
+                 if(originalShowInstructionsButton) originalShowInstructionsButton.onclick = () => instructionsModal.style.display = 'flex';
+            }
+
+            parseCSVData(); // Re-parse to ensure allPossibleOutputEmojis is correctly repopulated
+            renderEmojiPalette();
+            renderCurrentPostDisplay();
+            updateProgress(); // This will also call renderUnlockedEmojisGrid
+            winModal.style.display = 'none';
+            unlockedEmojisModal.style.display = 'none';
+        }
+
+        /**
+         * Initializes the game: parses data, sets up UI, and attaches event listeners.
+         */
+        function initializeGame() {
+            parseCSVData(); // Parse rules first
+            renderEmojiPalette();
+            renderCurrentPostDisplay();
+            updateProgress(); // Initial call to set up progress and unlocked grid
+            
+            // Attach event listeners to buttons
+            sendButton.onclick = handleSendPost;
+            backspaceButton.onclick = removeLastEmojiFromPost;
+
+            toggleUnlockedViewButton.onclick = () => toggleUnlockedView(true);
+            closeUnlockedViewButton.onclick = () => toggleUnlockedView(false);
+            
+            const initialShowInstructionsButton = document.getElementById('show-instructions-button');
+            if(initialShowInstructionsButton) initialShowInstructionsButton.onclick = () => instructionsModal.style.display = 'flex';
+            
+            closeInstructionsButton.onclick = () => instructionsModal.style.display = 'none';
+            instructionsModalOkButton.onclick = () => instructionsModal.style.display = 'none';
+
+            playAgainButton.onclick = resetGame;
+
+            // Event listener to close modals when clicking outside their content area
+            window.onclick = function(event) {
+                if (event.target == instructionsModal) {
+                    instructionsModal.style.display = "none";
+                }
+                if (event.target == unlockedEmojisModal) {
+                    unlockedEmojisModal.style.display = "none";
+                }
+                // Note: Win modal is intentionally not closed by outside click; requires "Play Again".
+            }
+        }
+
+        // Start the game once the DOM is fully loaded and ready
+        document.addEventListener('DOMContentLoaded', initializeGame);
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emote & Evade: The Emoji Dungeon</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Arial Emoji', sans-serif; /* Added Arial Emoji for better emoji rendering */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #1a1a2e; /* Dark blueish background */
+            color: #e0e0e0; /* Light text color */
+            overflow: hidden; /* Prevent scrollbars from canvas */
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 2px solid #4a4a8a; /* Purple-ish border */
+            border-radius: 10px;
+            padding: 10px;
+            background-color: #2a2a4a; /* Darker purple-ish background for container */
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+        canvas {
+            border: 1px solid #6a6a9a; /* Lighter purple border for canvas */
+            border-radius: 8px;
+            background-color: #f0f0f0; /* Light background for the game area itself for contrast */
+            display: block; /* Remove extra space below canvas */
+        }
+        #uiContainer {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            padding: 10px 0;
+            font-size: 1.1em;
+            flex-wrap: wrap; /* Allow UI elements to wrap on smaller screens */
+        }
+        .ui-element {
+            margin: 5px 10px;
+            padding: 8px 12px;
+            background-color: #3a3a6a; /* Darker purple for UI elements */
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        #messageLog {
+            width: calc(100% - 20px); /* Full width minus padding */
+            max-width: 800px; /* Match canvas width */
+            height: 60px;
+            background-color: #1e1e3e; /* Very dark blue for message log */
+            color: #a0a0ff; /* Light blue text for messages */
+            border: 1px solid #4a4a8a;
+            border-radius: 6px;
+            padding: 8px;
+            margin-top: 10px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.9em;
+            text-align: left;
+        }
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #2a2a4a;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+            text-align: center;
+            color: #e0e0e0;
+        }
+        .modal-content h2 {
+            margin-top: 0;
+            color: #7aa5ff; /* Light blue for modal titles */
+        }
+        .modal-content button {
+            background-color: #4CAF50; /* Green */
+            color: white;
+            padding: 10px 20px;
+            margin: 10px 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .modal-content button:hover {
+            background-color: #45a049;
+        }
+        .interaction-prompt {
+            position: absolute; /* Position relative to canvas */
+            font-size: 24px; /* Larger interaction prompt */
+            color: black; /* Make it visible on light canvas */
+            text-shadow: 1px 1px 2px white; /* Add shadow for visibility */
+            pointer-events: none; /* So it doesn't interfere with clicks */
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="uiContainer">
+            <div class="ui-element">HP: <span id="playerHP">30</span> / <span id="playerMaxHP">30</span> 🩷</div>
+            <div class="ui-element">MP: <span id="playerMP">15</span> / <span id="playerMaxMP">15</span> 🩵</div>
+            <div class="ui-element">Gold: <span id="playerGold">0</span> 💰</div>
+            <div class="ui-element">Weapon: <span id="playerWeapon">⚔️</span></div>
+            <div class="ui-element">Spell: <span id="playerSpell">🚫</span></div>
+            <div class="ui-element">Dungeon: <span id="dungeonLevel">Hub</span></div>
+            <div class="ui-element">Player Lvl: <span id="playerLevel">1</span> ✨</div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div id="messageLog">Welcome to Emote & Evade! Move with WASD or Arrow Keys. Interact with 'E'.</div>
+    </div>
+
+    <div id="dungeonSelectionModal" class="modal">
+        <div class="modal-content">
+            <h2>Select Dungeon</h2>
+            <div id="dungeonList">
+                </div>
+            <button onclick="closeDungeonSelectionModal()">Cancel</button>
+        </div>
+    </div>
+
+    <div id="merchantModal" class="modal">
+        <div class="modal-content">
+            <h2 id="merchantName">Merchant</h2>
+            <div id="merchantInventory"></div>
+            <p>Gold: <span id="modalPlayerGold">0</span> 💰</p>
+            <button onclick="closeMerchantModal()">Close</button>
+        </div>
+    </div>
+
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+            <h2>Game Over 😵</h2>
+            <p>You have been defeated.</p>
+            <p>Final Score: <span id="finalScore">0</span></p>
+            <button onclick="restartGame()">Restart Game</button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Game Constants and Configuration ---
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        const TILE_SIZE = 32; // Size of each grid tile in pixels
+        const PLAYER_SPEED_PIXELS_PER_FRAME = 4; // For smooth sliding animation
+        const TURN_DURATION_MS = 250; // How often enemies perform actions
+
+        const GRID_COLS = Math.floor(CANVAS_WIDTH / TILE_SIZE);
+        const GRID_ROWS = Math.floor(CANVAS_HEIGHT / TILE_SIZE);
+
+        // --- DOM Elements ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        const playerHPUI = document.getElementById('playerHP');
+        const playerMaxHPUI = document.getElementById('playerMaxHP');
+        const playerMPUI = document.getElementById('playerMP');
+        const playerMaxMPUI = document.getElementById('playerMaxMP');
+        const playerGoldUI = document.getElementById('playerGold');
+        const playerWeaponUI = document.getElementById('playerWeapon');
+        const playerSpellUI = document.getElementById('playerSpell');
+        const dungeonLevelUI = document.getElementById('dungeonLevel');
+        const playerLevelUI = document.getElementById('playerLevel');
+        const messageLog = document.getElementById('messageLog');
+
+        const dungeonSelectionModal = document.getElementById('dungeonSelectionModal');
+        const dungeonListDiv = document.getElementById('dungeonList');
+        const merchantModal = document.getElementById('merchantModal');
+        const merchantNameUI = document.getElementById('merchantName');
+        const merchantInventoryUI = document.getElementById('merchantInventory');
+        const modalPlayerGoldUI = document.getElementById('modalPlayerGold');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const finalScoreUI = document.getElementById('finalScore');
+
+        // --- Game State ---
+        let player;
+        let currentMap; // Can be hub or a dungeon room
+        let dungeons = [];
+        let unlockedDungeons = [1]; // Player starts with Dungeon 1 unlocked
+        let merchants = {}; // { type: { emoji, name, inventory, rescued } }
+        let gameState = 'hub'; // 'hub', 'dungeon', 'paused', 'gameOver', 'merchant'
+        let currentDungeonIndex = -1;
+        let currentRoomIndex = -1;
+        let interactionPrompt = { show: false, x: 0, y: 0, text: '❗' };
+        let lastEnemyActionTime = 0;
+        let animationFrameId;
+        let screenFade = { active: false, alpha: 0, mode: 'out', onComplete: null, duration: 500, startTime: 0 };
+
+        // --- Player Object Definition (from TDD) ---
+        function createPlayer() {
+            return {
+                x: Math.floor(GRID_COLS / 2), // Grid X coordinate
+                y: Math.floor(GRID_ROWS / 2), // Grid Y coordinate
+                pixelX: Math.floor(GRID_COLS / 2) * TILE_SIZE, // Pixel X for smooth animation
+                pixelY: Math.floor(GRID_ROWS / 2) * TILE_SIZE, // Pixel Y for smooth animation
+                targetX: Math.floor(GRID_COLS / 2) * TILE_SIZE,
+                targetY: Math.floor(GRID_ROWS / 2) * TILE_SIZE,
+                isMoving: false,
+                hp: 30,
+                maxHp: 30,
+                mp: 15,
+                maxMp: 15,
+                gold: 0,
+                level: 1,
+                exp: 0,
+                expToNextLevel: 100,
+                baseAttack: 5,
+                baseDefense: 2,
+                equippedWeapon: { name: 'Sword', emoji: '⚔️', attackBonus: 2, type: 'weapon' },
+                equippedSpell: { name: 'None', emoji: '🚫', type: 'spell' }, // Example spell structure
+                statusEffects: [],
+                currentEmoji: '🙂',
+                animationFrame: 0,
+                isAttacking: false,
+                isHit: false,
+                hitAnimationTimer: 0,
+                attackAnimationTimer: 0,
+                inventory: [], // For potions, keys etc.
+                score: 0,
+            };
+        }
+
+        // --- Enemy Object Definition ---
+        function createEnemy(type, x, y, emoji, hp, attack, defense = 0, ai = 'basic_melee', drops = {goldMin:1, goldMax:3, items:[]}) {
+            return {
+                id: `enemy_${Date.now()}_${Math.random()}`,
+                type: type,
+                emoji: emoji,
+                x: x, // Grid X
+                y: y, // Grid Y
+                pixelX: x * TILE_SIZE,
+                pixelY: y * TILE_SIZE,
+                hp: hp,
+                maxHp: hp,
+                attackDamage: attack,
+                defense: defense,
+                aiType: ai,
+                isAttacking: false,
+                isHit: false,
+                hitAnimationTimer: 0,
+                attackAnimationTimer: 0,
+                attackCooldown: 2000, // ms
+                lastAttackTime: 0,
+                drops: drops,
+                targetTile: null, // For telegraphing attacks
+                windUpTime: 500, // ms for wind-up
+                isWindingUp: false,
+            };
+        }
+        
+        // --- Item Definitions ---
+        const ITEMS = {
+            'health_potion_small': { name: 'Small Health Potion', emoji: '❤️', type: 'consumable', effect: 'heal', value: 10, cost: 10 },
+            'mana_potion_small': { name: 'Small Mana Potion', emoji: '💧', type: 'consumable', effect: 'mana', value: 10, cost: 8 },
+            'key': { name: 'Dungeon Key', emoji: '🔑', type: 'utility', cost: 25},
+            'wooden_sword': { name: 'Wooden Sword', emoji: '⚔️', type: 'weapon', attackBonus: 2, cost: 20 },
+            'iron_sword': { name: 'Iron Sword', emoji: '⚔️', type: 'weapon', attackBonus: 5, cost: 50 },
+            'leather_vest': { name: 'Leather Vest', emoji: '👕', type: 'armor', defenseBonus: 2, cost: 15 },
+        };
+
+        // --- Map/Dungeon Definitions ---
+        function createHubMap() {
+            let map = {
+                id: 'hub',
+                name: 'Castle Courtyard',
+                width: GRID_COLS,
+                height: GRID_ROWS,
+                tiles: [], // '.' for floor, '#' for wall
+                interactables: [], // {x, y, type: 'fountain'/'dungeon_gate'/'merchant_stall', emoji, merchantType}
+                enemies: [], // Hub is safe
+                isCleared: true, // Hub is always "cleared"
+            };
+            // Basic wall border
+            for (let r = 0; r < GRID_ROWS; r++) {
+                map.tiles[r] = [];
+                for (let c = 0; c < GRID_COLS; c++) {
+                    if (r === 0 || r === GRID_ROWS - 1 || c === 0 || c === GRID_COLS - 1) {
+                        map.tiles[r][c] = '#'; // Wall
+                    } else {
+                        map.tiles[r][c] = '.'; // Floor
+                    }
+                }
+            }
+            // Add interactables
+            map.interactables.push({ x: Math.floor(GRID_COLS / 2), y: Math.floor(GRID_ROWS / 2) - 2, type: 'fountain', emoji: '⛲', name: 'Fountain (Replenish HP/MP)' });
+            map.interactables.push({ x: Math.floor(GRID_COLS / 2) + 5, y: Math.floor(GRID_ROWS / 2), type: 'dungeon_gate', emoji: '🚪', name: 'Dungeon Gate' });
+            
+            // Merchant Stalls (initially empty)
+            map.interactables.push({ x: 5, y: 5, type: 'merchant_stall', emoji: '🛒', merchantType: 'weapon', name: 'Weapon Merchant Stall' });
+            map.interactables.push({ x: GRID_COLS - 6, y: 5, type: 'merchant_stall', emoji: '🛒', merchantType: 'armor', name: 'Armor Merchant Stall' });
+            map.interactables.push({ x: 5, y: GRID_ROWS - 6, type: 'merchant_stall', emoji: '🛒', merchantType: 'item', name: 'Item Merchant Stall' });
+            map.interactables.push({ x: GRID_COLS - 6, y: GRID_ROWS - 6, type: 'merchant_stall', emoji: '🛒', merchantType: 'spell', name: 'Spell Merchant Stall' });
+            
+            return map;
+        }
+
+        function initializeMerchants() {
+            merchants = {
+                'weapon': { emoji: '🧑‍🔧', name: 'Weapon Merchant', rescued: false, inventory: [ITEMS.wooden_sword, ITEMS.iron_sword] },
+                'armor': { emoji: '🧑‍🍳', name: 'Armor Merchant', rescued: false, inventory: [ITEMS.leather_vest] }, // Using chef for armor merchant as per GDD
+                'item': { emoji: '🧑‍⚕️', name: 'Item Merchant', rescued: false, inventory: [ITEMS.health_potion_small, ITEMS.mana_potion_small, ITEMS.key] },
+                'spell': { emoji: '🧙‍♂️', name: 'Spell Merchant', rescued: false, inventory: [] }, // Add spells later
+            };
+        }
+
+
+        function generateDungeon(level) {
+            const numRooms = Math.min(8 + level * 2, 20); // e.g., L1: 10 rooms, L5: 18 rooms
+            let dungeon = {
+                level: level,
+                rooms: [],
+                bossDefeated: false,
+                merchantRescuedThisRun: null,
+            };
+
+            for (let i = 0; i < numRooms; i++) {
+                let room = {
+                    id: `d${level}_r${i}`,
+                    width: GRID_COLS,
+                    height: GRID_ROWS,
+                    tiles: [],
+                    enemies: [],
+                    items: [], // Dropped items
+                    interactables: [], // chests, portals, rescued merchants
+                    isCleared: false,
+                    isBossRoom: i === numRooms - 1, // Last room is boss room
+                    hasMerchantToRescue: false,
+                    merchantTypeToRescue: null,
+                };
+
+                // Basic room layout (open space with walls)
+                for (let r = 0; r < GRID_ROWS; r++) {
+                    room.tiles[r] = [];
+                    for (let c = 0; c < GRID_COLS; c++) {
+                        if (r === 0 || r === GRID_ROWS - 1 || c === 0 || c === GRID_COLS - 1) {
+                            room.tiles[r][c] = '#';
+                        } else {
+                            room.tiles[r][c] = '.';
+                        }
+                    }
+                }
+                
+                // Doors (simplified: one entry, one exit for now)
+                // Entry door (except for first room)
+                if (i > 0) room.tiles[Math.floor(GRID_ROWS/2)][0] = 'D'; 
+                // Exit door (except for boss room if it's the last)
+                if (!room.isBossRoom) room.tiles[Math.floor(GRID_ROWS/2)][GRID_COLS-1] = 'D';
+
+
+                // Populate enemies (not in boss room initially, boss spawns separately)
+                if (!room.isBossRoom) {
+                    const enemyCount = Math.min(1 + Math.floor(Math.random() * (level + 1)), 6); // Max 6 enemies
+                    for (let k = 0; k < enemyCount; k++) {
+                        let ex, ey;
+                        do {
+                            ex = Math.floor(Math.random() * (GRID_COLS - 4)) + 2; // Not too close to edges/player start
+                            ey = Math.floor(Math.random() * (GRID_ROWS - 4)) + 2;
+                        } while (isOccupied(room, ex, ey) || (ex === player.x && ey === player.y));
+                        
+                        const enemyTypes = [
+                            () => createEnemy('Goblin', ex, ey, '👺', 10 + level * 2, 3 + level, 0 + Math.floor(level/2)),
+                            () => createEnemy('Skeleton', ex, ey, '💀', 15 + level * 3, 4 + level, 1 + Math.floor(level/2)),
+                            () => createEnemy('Slime', ex, ey, '🦠', 8 + level * 2, 2 + level, 0 + Math.floor(level/3), 'random_mover_melee'),
+                        ];
+                        if (level > 2) enemyTypes.push(() => createEnemy('Ghost', ex, ey, '👻', 12 + level * 2, 5 + level, 2 + Math.floor(level/2), 'phasing_melee'));
+                        
+                        room.enemies.push(enemyTypes[Math.floor(Math.random() * enemyTypes.length)]());
+                    }
+                } else { // Boss room
+                    let bx, by;
+                    do {
+                        bx = Math.floor(GRID_COLS * 0.75); 
+                        by = Math.floor(GRID_ROWS / 2);
+                    } while (isOccupied(room, bx, by));
+                    const bossEmoji = ['👹', '🐉', '🧌', '🤖'][Math.min(level-1, 3)]; // Different boss per few levels
+                    room.enemies.push(createEnemy(`Boss_L${level}`, bx, by, bossEmoji, 50 + level * 15, 8 + level * 2, 3 + level));
+                }
+
+                // Chance to have a merchant to rescue (not in boss room, only if one isn't rescued yet)
+                const unrescuedMerchants = Object.keys(merchants).filter(mType => !merchants[mType].rescued);
+                if (!room.isBossRoom && i > 0 && i < numRooms -1 && unrescuedMerchants.length > 0 && Math.random() < 0.2) { // 20% chance
+                    room.hasMerchantToRescue = true;
+                    room.merchantTypeToRescue = unrescuedMerchants[Math.floor(Math.random() * unrescuedMerchants.length)];
+                    let mx, my;
+                    do {
+                        mx = Math.floor(Math.random() * (GRID_COLS - 6)) + 3;
+                        my = Math.floor(Math.random() * (GRID_ROWS - 6)) + 3;
+                    } while (isOccupied(room, mx, my) || room.enemies.some(e => e.x === mx && e.y === my));
+                    room.interactables.push({
+                        x: mx, y: my, type: 'rescue_merchant', emoji: merchants[room.merchantTypeToRescue].emoji + '❓', name: `Rescue ${merchants[room.merchantTypeToRescue].name}`, merchantType: room.merchantTypeToRescue
+                    });
+                }
+                dungeon.rooms.push(room);
+            }
+            dungeons[level -1] = dungeon;
+            return dungeon;
+        }
+
+        function isOccupied(room, x, y) {
+            if (x < 0 || x >= GRID_COLS || y < 0 || y >= GRID_ROWS) return true; // Out of bounds
+            if (room.tiles[y][x] === '#') return true; // Wall
+            return false;
+        }
+
+        // --- Game Loop ---
+        let lastTimestamp = 0;
+        function gameLoop(timestamp) {
+            const deltaTime = timestamp - lastTimestamp;
+            lastTimestamp = timestamp;
+
+            if (gameState !== 'gameOver' && gameState !== 'paused' && gameState !== 'merchant') {
+                update(deltaTime);
+            }
+            render();
+            
+            if (screenFade.active) {
+                handleScreenFade(timestamp);
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- Update Functions ---
+        function update(deltaTime) {
+            if (player.isMoving) {
+                movePlayerSmoothly(deltaTime);
+            }
+            
+            // Enemy actions based on TURN_DURATION_MS, but movement/animations can be smoother
+            const now = performance.now();
+            if (now - lastEnemyActionTime > TURN_DURATION_MS && currentMap.enemies && currentMap.enemies.length > 0) {
+                currentMap.enemies.forEach(enemy => updateEnemy(enemy, deltaTime));
+                lastEnemyActionTime = now;
+            }
+            
+            // Update animations independent of turn
+            if (player.hitAnimationTimer > 0) player.hitAnimationTimer -= deltaTime;
+            if (player.attackAnimationTimer > 0) player.attackAnimationTimer -= deltaTime;
+            currentMap.enemies.forEach(enemy => {
+                if (enemy.hitAnimationTimer > 0) enemy.hitAnimationTimer -= deltaTime;
+                if (enemy.attackAnimationTimer > 0) enemy.attackAnimationTimer -= deltaTime;
+                if (enemy.isWindingUp) {
+                    enemy.windUpTime -= deltaTime;
+                    if (enemy.windUpTime <=0) {
+                        enemy.isWindingUp = false;
+                        // Execute attack if player is still on target tile
+                        if (enemy.targetTile && player.x === enemy.targetTile.x && player.y === enemy.targetTile.y) {
+                            playerTakeDamage(enemy.attackDamage);
+                        }
+                        enemy.targetTile = null; // Clear telegraph
+                        enemy.lastAttackTime = performance.now();
+                    }
+                }
+            });
+
+
+            updatePlayerEmoji();
+            checkInteractions();
+        }
+
+        function movePlayerSmoothly() {
+            const speed = PLAYER_SPEED_PIXELS_PER_FRAME;
+            let moved = false;
+            if (player.pixelX < player.targetX) { player.pixelX = Math.min(player.pixelX + speed, player.targetX); moved = true; }
+            else if (player.pixelX > player.targetX) { player.pixelX = Math.max(player.pixelX - speed, player.targetX); moved = true; }
+            
+            if (player.pixelY < player.targetY) { player.pixelY = Math.min(player.pixelY + speed, player.targetY); moved = true; }
+            else if (player.pixelY > player.targetY) { player.pixelY = Math.max(player.pixelY - speed, player.targetY); moved = true; }
+
+            if (player.pixelX === player.targetX && player.pixelY === player.targetY) {
+                player.isMoving = false;
+                // If moved to a door in a dungeon
+                if (gameState === 'dungeon' && currentMap.tiles[player.y][player.x] === 'D') {
+                    if (player.x === GRID_COLS - 1) { // Right door (exit)
+                        if (currentRoomIndex < dungeons[currentDungeonIndex].rooms.length - 1) {
+                            changeRoom(currentRoomIndex + 1);
+                        }
+                    } else if (player.x === 0) { // Left door (entry/previous)
+                         if (currentRoomIndex > 0) {
+                            changeRoom(currentRoomIndex - 1);
+                        }
+                    }
+                }
+            }
+        }
+        
+        function updatePlayerEmoji() {
+            if (player.hp <= 0) { player.currentEmoji = '😵'; return; }
+            if (player.isAttacking && player.attackAnimationTimer > 0) { player.currentEmoji = '😠'; return; }
+            if (player.isHit && player.hitAnimationTimer > 0) { player.currentEmoji = '😖'; return; }
+            
+            const hpPercent = player.hp / player.maxHp;
+            if (hpPercent < 0.25) player.currentEmoji = '🤕';
+            else if (hpPercent < 0.50) player.currentEmoji = '😕';
+            else if (hpPercent < 0.75) player.currentEmoji = '🤨';
+            else player.currentEmoji = '🙂'; // Idle
+        }
+
+        function updateEnemy(enemy, deltaTime) {
+            if (enemy.hp <= 0 || enemy.isWindingUp) return;
+
+            // Basic AI: Move towards player if in range, or random if not
+            const dx = player.x - enemy.x;
+            const dy = player.y - enemy.y;
+            const distance = Math.sqrt(dx*dx + dy*dy);
+            const now = performance.now();
+
+            // Attack logic
+            if (distance <= 1.5 && now - enemy.lastAttackTime > enemy.attackCooldown) { // Attack range of 1 tile
+                enemy.isAttacking = true;
+                enemy.attackAnimationTimer = 300; // Duration of attack animation
+                
+                // Telegraph attack
+                enemy.isWindingUp = true;
+                enemy.windUpTime = 500; // ms for wind-up animation
+                enemy.targetTile = { x: player.x, y: player.y }; // Target player's current tile
+                addLogMessage(`${enemy.emoji} winds up an attack!`, 'enemy-action');
+                // Actual damage dealt after windUpTime in main update loop
+                return; // Don't move if attacking
+            }
+            enemy.isAttacking = false;
+
+            // Movement logic
+            let moved = false;
+            let newEx = enemy.x;
+            let newEy = enemy.y;
+
+            if (distance < 8 && distance > 1) { // Chase if player is somewhat close but not adjacent
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    newEx += Math.sign(dx);
+                } else {
+                    newEy += Math.sign(dy);
+                }
+            } else if (distance > 1) { // Random move if player is far or not visible
+                const randMove = Math.floor(Math.random() * 4);
+                if (randMove === 0 && enemy.y > 1) newEy--; // Up
+                else if (randMove === 1 && enemy.y < GRID_ROWS - 2) newEy++; // Down
+                else if (randMove === 2 && enemy.x > 1) newEx--; // Left
+                else if (randMove === 3 && enemy.x < GRID_COLS - 2) newEx++; // Right
+            }
+
+            if (!isOccupied(currentMap, newEx, newEy) && !(newEx === player.x && newEy === player.y) && !currentMap.enemies.some(e => e.id !== enemy.id && e.x === newEx && e.y === newEy)) {
+                enemy.x = newEx;
+                enemy.y = newEy;
+                enemy.pixelX = newEx * TILE_SIZE;
+                enemy.pixelY = newEy * TILE_SIZE;
+                moved = true;
+            }
+        }
+
+        function checkInteractions() {
+            interactionPrompt.show = false;
+            if (!currentMap.interactables) return;
+
+            for (const interactable of currentMap.interactables) {
+                if (Math.abs(player.x - interactable.x) <= 1 && Math.abs(player.y - interactable.y) <= 1) {
+                    interactionPrompt.show = true;
+                    interactionPrompt.x = interactable.x * TILE_SIZE + TILE_SIZE / 2;
+                    interactionPrompt.y = interactable.y * TILE_SIZE - TILE_SIZE / 2; // Above the interactable
+                    interactionPrompt.text = '❗';
+                    if (interactable.type === 'chest_open') interactionPrompt.show = false; // Don't show for opened chests
+                    return; // Show only one prompt at a time
+                }
+            }
+        }
+        
+        function handleInteraction() {
+            if (!interactionPrompt.show) return;
+
+            for (const interactable of currentMap.interactables) {
+                if (Math.abs(player.x - interactable.x) <= 1 && Math.abs(player.y - interactable.y) <= 1) {
+                    switch (interactable.type) {
+                        case 'fountain':
+                            player.hp = player.maxHp;
+                            player.mp = player.maxMp;
+                            addLogMessage("You feel refreshed! HP and MP restored. 😇", 'system');
+                            player.currentEmoji = '😇'; // Temporary emoji
+                            setTimeout(() => updatePlayerEmoji(), 1000);
+                            break;
+                        case 'dungeon_gate':
+                            openDungeonSelectionModal();
+                            break;
+                        case 'chest':
+                            openChest(interactable);
+                            interactable.type = 'chest_open'; // Mark as opened
+                            interactable.emoji = ' ओपन'; // Change emoji to open chest (using a generic open box if specific one not available)
+                            break;
+                        case 'portal':
+                            returnToHub();
+                            break;
+                        case 'rescue_merchant':
+                            if (dungeons[currentDungeonIndex]) {
+                                dungeons[currentDungeonIndex].merchantRescuedThisRun = interactable.merchantType;
+                                merchants[interactable.merchantType].rescued = true; // Mark as rescued globally
+                                addLogMessage(`You rescued ${merchants[interactable.merchantType].name}! ${merchants[interactable.merchantType].emoji}`, 'event');
+                                // Remove interactable or change its state
+                                interactable.emoji = merchants[interactable.merchantType].emoji; // Show rescued merchant
+                                interactable.type = 'merchant_rescued_display'; // Change type to prevent re-rescue
+                            }
+                            break;
+                        case 'merchant_stall':
+                            if (merchants[interactable.merchantType] && merchants[interactable.merchantType].rescued) {
+                                openMerchantModal(interactable.merchantType);
+                            } else {
+                                addLogMessage(`${interactable.name} (Merchant not yet rescued)`, 'system');
+                            }
+                            break;
+                    }
+                    updateUI();
+                    return; 
+                }
+            }
+        }
+
+        function openChest(chest) {
+            player.currentEmoji = '🤑';
+            setTimeout(() => updatePlayerEmoji(), 1000);
+            
+            // Random item or gold
+            const rand = Math.random();
+            if (rand < 0.7) { // 70% chance for gold
+                const goldAmount = Math.floor(Math.random() * (10 + currentDungeonIndex * 5)) + 5 + currentDungeonIndex * 2;
+                player.gold += goldAmount;
+                player.score += goldAmount;
+                addLogMessage(`You found ${goldAmount} gold! 💰`, 'loot');
+            } else { // 30% chance for an item
+                const itemKeys = Object.keys(ITEMS).filter(k => ITEMS[k].cost < 50); // Basic items
+                const randomItemKey = itemKeys[Math.floor(Math.random() * itemKeys.length)];
+                const item = {...ITEMS[randomItemKey]}; // Create a copy
+                
+                if (item.type === 'weapon') {
+                    // Simple: replace if better. Could be more complex (inventory for weapons)
+                    if (!player.equippedWeapon || item.attackBonus > player.equippedWeapon.attackBonus) {
+                        addLogMessage(`You found a ${item.name} ${item.emoji}! (Equipped)`, 'loot');
+                        player.equippedWeapon = item;
+                    } else {
+                         addLogMessage(`You found a ${item.name} ${item.emoji}. (Yours is better)`, 'loot');
+                         // Could add to inventory to sell
+                    }
+                } else if (item.type === 'consumable') {
+                     addLogMessage(`You found a ${item.name} ${item.emoji}! (Added to inventory - Not implemented yet)`, 'loot');
+                     player.inventory.push(item); // Basic inventory add
+                } else {
+                    addLogMessage(`You found a ${item.name} ${item.emoji}!`, 'loot');
+                }
+                player.score += item.cost || 20; // Add item value to score
+            }
+            updateUI();
+        }
+        
+        function playerAttack(enemy) {
+            if (player.isAttacking && player.attackAnimationTimer > 0) return; // Already attacking
+
+            player.isAttacking = true;
+            player.attackAnimationTimer = 300; // Duration of attack animation
+            updatePlayerEmoji();
+
+            const damageDealt = Math.max(1, (player.baseAttack + (player.equippedWeapon ? player.equippedWeapon.attackBonus : 0)) - (enemy.defense || 0));
+            enemy.hp -= damageDealt;
+            enemy.isHit = true;
+            enemy.hitAnimationTimer = 200; // Duration of enemy hit animation
+            addLogMessage(`Player attacks ${enemy.emoji} for ${damageDealt} damage! 💢`, 'combat');
+
+            if (enemy.hp <= 0) {
+                enemyDefeated(enemy);
+            }
+            updateUI();
+        }
+
+        function playerTakeDamage(damage) {
+            const actualDamage = Math.max(1, damage - player.baseDefense); // Basic defense
+            player.hp -= actualDamage;
+            player.isHit = true;
+            player.hitAnimationTimer = 300; // Duration of player hit animation
+            updatePlayerEmoji();
+            addLogMessage(`Player takes ${actualDamage} damage from enemy! 😖`, 'combat-player');
+
+            if (player.hp <= 0) {
+                player.hp = 0;
+                gameOver();
+            }
+            updateUI();
+        }
+
+        function enemyDefeated(enemy) {
+            addLogMessage(`${enemy.emoji} defeated! 🎉`, 'event');
+            player.currentEmoji = '😁';
+            setTimeout(() => updatePlayerEmoji(), 1000);
+
+            // Remove enemy from map
+            currentMap.enemies = currentMap.enemies.filter(e => e.id !== enemy.id);
+            
+            // Drop loot
+            const goldDropped = Math.floor(Math.random() * (enemy.drops.goldMax - enemy.drops.goldMin + 1)) + enemy.drops.goldMin;
+            player.gold += goldDropped;
+            player.score += goldDropped + (enemy.maxHp / 2); // Score for defeating
+            addLogMessage(`Enemy dropped ${goldDropped} gold!`, 'loot');
+
+            // Check if room is cleared
+            if (currentMap.enemies.length === 0 && !currentMap.isCleared) {
+                currentMap.isCleared = true;
+                addLogMessage("Room cleared! Doors unlock.", 'event');
+                
+                // Spawn chest
+                if (!currentMap.isBossRoom) { // Don't spawn normal chest in boss room if boss drops specific loot
+                    let chestX, chestY;
+                    do {
+                        chestX = Math.floor(Math.random() * (GRID_COLS - 4)) + 2;
+                        chestY = Math.floor(Math.random() * (GRID_ROWS - 4)) + 2;
+                    } while (isOccupied(currentMap, chestX, chestY) || (player.x === chestX && player.y === chestY));
+                    currentMap.interactables.push({ x: chestX, y: chestY, type: 'chest', emoji: '📦', name: 'Chest' });
+                }
+
+                // If boss room cleared
+                if (currentMap.isBossRoom) {
+                    dungeons[currentDungeonIndex].bossDefeated = true;
+                    addLogMessage("Dungeon Boss Defeated! A portal appears.", 'event-major');
+                    player.score += 100 * (currentDungeonIndex + 1); // Bonus score for boss
+                    // Spawn portal
+                    let portalX, portalY;
+                    do {
+                        portalX = Math.floor(GRID_COLS / 2);
+                        portalY = Math.floor(GRID_ROWS / 2);
+                    } while (isOccupied(currentMap, portalX, portalY));
+                    currentMap.interactables.push({ x: portalX, y: portalY, type: 'portal', emoji: '🌀', name: 'Return to Hub' });
+
+                    // Unlock next dungeon if not already
+                    if (!unlockedDungeons.includes(currentDungeonIndex + 2) && currentDungeonIndex + 2 <= 15) { // Max 15 dungeons
+                        unlockedDungeons.push(currentDungeonIndex + 2);
+                        addLogMessage(`Dungeon Level ${currentDungeonIndex + 2} unlocked!`, 'event-major');
+                    }
+                }
+            }
+            updateUI();
+        }
+        
+        function startScreenFade(mode, onCompleteCallback) {
+            screenFade.active = true;
+            screenFade.mode = mode;
+            screenFade.alpha = (mode === 'out') ? 0 : 1;
+            screenFade.onComplete = onCompleteCallback;
+            screenFade.startTime = performance.now();
+        }
+
+        function handleScreenFade(timestamp) {
+            const elapsedTime = timestamp - screenFade.startTime;
+            const progress = Math.min(elapsedTime / screenFade.duration, 1);
+
+            if (screenFade.mode === 'out') {
+                screenFade.alpha = progress;
+            } else { // 'in'
+                screenFade.alpha = 1 - progress;
+            }
+
+            if (progress >= 1) {
+                screenFade.active = false;
+                if (screenFade.onComplete) {
+                    screenFade.onComplete();
+                }
+            }
+        }
+
+        function changeRoom(newRoomIndex) {
+            startScreenFade('out', () => {
+                currentRoomIndex = newRoomIndex;
+                currentMap = dungeons[currentDungeonIndex].rooms[currentRoomIndex];
+                // Position player at the entrance of the new room
+                if (player.x > GRID_COLS / 2) { // Came from right, enter on left
+                    player.x = 1; 
+                } else { // Came from left, enter on right
+                    player.x = GRID_COLS - 2;
+                }
+                player.y = Math.floor(GRID_ROWS / 2); // Middle Y
+                player.pixelX = player.x * TILE_SIZE;
+                player.targetX = player.pixelX;
+                player.pixelY = player.y * TILE_SIZE;
+                player.targetY = player.pixelY;
+                player.isMoving = false;
+                addLogMessage(`Entered Room ${currentRoomIndex + 1} of Dungeon ${currentDungeonIndex + 1}`, 'system');
+                updateUI();
+                startScreenFade('in', null);
+            });
+        }
+
+        function enterDungeon(level) {
+            closeDungeonSelectionModal();
+            startScreenFade('out', () => {
+                gameState = 'dungeon';
+                currentDungeonIndex = level - 1;
+                if (!dungeons[currentDungeonIndex] || dungeons[currentDungeonIndex].bossDefeated) { // Generate if not existing or if re-entering a cleared one
+                    generateDungeon(level);
+                }
+                currentRoomIndex = 0;
+                currentMap = dungeons[currentDungeonIndex].rooms[currentRoomIndex];
+                
+                // Position player at start of first room
+                player.x = 2; // A bit into the room
+                player.y = Math.floor(GRID_ROWS / 2);
+                player.pixelX = player.x * TILE_SIZE;
+                player.targetX = player.pixelX;
+                player.pixelY = player.y * TILE_SIZE;
+                player.targetY = player.pixelY;
+                player.isMoving = false;
+
+                addLogMessage(`Entering Dungeon Level ${level}...`, 'system');
+                updateUI();
+                startScreenFade('in', null);
+            });
+        }
+
+        function returnToHub() {
+             startScreenFade('out', () => {
+                gameState = 'hub';
+                currentMap = createHubMap(); // Recreate hub to reflect rescued merchants
+                currentDungeonIndex = -1;
+                currentRoomIndex = -1;
+                // Position player near gate
+                player.x = Math.floor(GRID_COLS / 2) + 3;
+                player.y = Math.floor(GRID_ROWS / 2);
+                player.pixelX = player.x * TILE_SIZE;
+                player.targetX = player.pixelX;
+                player.pixelY = player.y * TILE_SIZE;
+                player.targetY = player.pixelY;
+                player.isMoving = false;
+                addLogMessage("Returned to Castle Courtyard.", 'system');
+                updateUI();
+                startScreenFade('in', null);
+            });
+        }
+
+        function gameOver() {
+            gameState = 'gameOver';
+            cancelAnimationFrame(animationFrameId); // Stop the game loop
+            finalScoreUI.textContent = player.score;
+            gameOverModal.style.display = 'flex';
+            addLogMessage("Game Over! 😵", 'system-critical');
+        }
+        
+        function restartGame() {
+            gameOverModal.style.display = 'none';
+            player = createPlayer();
+            dungeons = []; // Reset dungeons
+            unlockedDungeons = [1];
+            initializeMerchants(); // Reset merchant rescue status
+            currentMap = createHubMap();
+            gameState = 'hub';
+            currentDungeonIndex = -1;
+            currentRoomIndex = -1;
+            addLogMessage("Game Restarted. Welcome back!", 'system');
+            updateUI();
+            lastTimestamp = performance.now(); // Reset timestamp for loop
+            gameLoop(lastTimestamp);
+        }
+
+
+        // --- Rendering Functions ---
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#c2b280'; // Dungeon floor color (light tan/sandstone)
+            if (gameState === 'hub') ctx.fillStyle = '#87CEEB'; // Sky blue for hub
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // Render map tiles
+            ctx.font = `${TILE_SIZE * 0.8}px 'Arial Emoji', monospace`; // Ensure emoji font is used
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    const tile = currentMap.tiles[r][c];
+                    const xPos = c * TILE_SIZE + TILE_SIZE / 2;
+                    const yPos = r * TILE_SIZE + TILE_SIZE / 2;
+                    if (tile === '#') {
+                        ctx.fillStyle = '#654321'; // Brown for walls
+                        ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        // Simple 3D effect for walls
+                        ctx.fillStyle = '#8c6f4d'; // Lighter top
+                        ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE * 0.2);
+                    } else if (tile === 'D') {
+                        ctx.fillStyle = '#8B4513'; // Wooden door color
+                        ctx.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                        ctx.fillStyle = '#000';
+                        // Simple door knob
+                        ctx.beginPath();
+                        ctx.arc(xPos + TILE_SIZE * 0.2, yPos, TILE_SIZE * 0.1, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                     // Floor is already drawn by the background fill
+                }
+            }
+            
+            // Render interactables
+            if (currentMap.interactables) {
+                currentMap.interactables.forEach(item => {
+                    let emojiToDraw = item.emoji;
+                    if (item.type === 'merchant_stall' && merchants[item.merchantType]?.rescued) {
+                        emojiToDraw = merchants[item.merchantType].emoji; // Show rescued merchant emoji
+                    }
+                    ctx.fillText(emojiToDraw, item.x * TILE_SIZE + TILE_SIZE / 2, item.y * TILE_SIZE + TILE_SIZE / 2);
+                });
+            }
+
+            // Render enemies
+            if (currentMap.enemies) {
+                currentMap.enemies.forEach(enemy => {
+                    let enemyX = enemy.pixelX + TILE_SIZE / 2;
+                    let enemyY = enemy.pixelY + TILE_SIZE / 2;
+                    let enemyEmoji = enemy.emoji;
+
+                    if (enemy.isHit && enemy.hitAnimationTimer > 0) { // Shake effect
+                        enemyX += (Math.random() - 0.5) * TILE_SIZE * 0.2;
+                        enemyY += (Math.random() - 0.5) * TILE_SIZE * 0.2;
+                        enemyEmoji = '💥'; // or enemy.emoji + '💢'
+                    }
+                     if (enemy.isAttacking && enemy.attackAnimationTimer > 0) {
+                        // Could add a lunge or different emoji
+                    }
+                    ctx.fillText(enemyEmoji, enemyX, enemyY);
+
+                    // Render HP bar for enemies
+                    if (enemy.hp < enemy.maxHp) {
+                        const hpBarWidth = TILE_SIZE * 0.8;
+                        const hpBarHeight = 5;
+                        const hpBarX = enemy.pixelX + TILE_SIZE * 0.1;
+                        const hpBarY = enemy.pixelY - hpBarHeight - 2;
+                        ctx.fillStyle = 'red';
+                        ctx.fillRect(hpBarX, hpBarY, hpBarWidth * (enemy.hp / enemy.maxHp), hpBarHeight);
+                        ctx.strokeStyle = 'black';
+                        ctx.strokeRect(hpBarX, hpBarY, hpBarWidth, hpBarHeight);
+                    }
+                    
+                    // Render telegraph for enemy attacks
+                    if (enemy.targetTile && enemy.isWindingUp) {
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; // Semi-transparent red
+                        ctx.fillRect(enemy.targetTile.x * TILE_SIZE, enemy.targetTile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                    }
+                });
+            }
+
+            // Render player
+            let playerRenderX = player.pixelX + TILE_SIZE / 2;
+            let playerRenderY = player.pixelY + TILE_SIZE / 2;
+            if (player.isHit && player.hitAnimationTimer > 0) { // Shake effect
+                playerRenderX += (Math.random() - 0.5) * TILE_SIZE * 0.2;
+                playerRenderY += (Math.random() - 0.5) * TILE_SIZE * 0.2;
+            }
+            ctx.fillText(player.currentEmoji, playerRenderX, playerRenderY);
+
+            // Render interaction prompt
+            if (interactionPrompt.show) {
+                ctx.font = `${TILE_SIZE * 0.7}px 'Arial Emoji', monospace`;
+                ctx.fillStyle = 'black';
+                ctx.fillText(interactionPrompt.text, interactionPrompt.x, interactionPrompt.y);
+            }
+            
+            // Render screen fade
+            if (screenFade.active) {
+                ctx.fillStyle = `rgba(0, 0, 0, ${screenFade.alpha})`;
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            }
+        }
+
+        function updateUI() {
+            playerHPUI.textContent = player.hp;
+            playerMaxHPUI.textContent = player.maxHp;
+            playerMPUI.textContent = player.mp;
+            playerMaxMPUI.textContent = player.maxMp;
+            playerGoldUI.textContent = player.gold;
+            playerWeaponUI.textContent = player.equippedWeapon ? player.equippedWeapon.emoji : '✊';
+            playerSpellUI.textContent = player.equippedSpell ? player.equippedSpell.emoji : '🚫';
+            playerLevelUI.textContent = player.level;
+
+            if (gameState === 'hub') {
+                dungeonLevelUI.textContent = 'Hub';
+            } else if (gameState === 'dungeon' && currentDungeonIndex !== -1) {
+                dungeonLevelUI.textContent = `Dungeon ${currentDungeonIndex + 1} (Room ${currentRoomIndex + 1})`;
+            }
+        }
+
+        function addLogMessage(message, type = 'normal') {
+            const p = document.createElement('p');
+            p.textContent = `> ${message}`;
+            if (type === 'combat') p.style.color = '#ffdddd'; // Light red for player attack
+            else if (type === 'combat-player') p.style.color = '#ffaaaa'; // Redder for damage to player
+            else if (type === 'loot') p.style.color = '#ddffdd'; // Light green
+            else if (type === 'event') p.style.color = '#ffffdd'; // Light yellow
+            else if (type === 'event-major') p.style.color = '#ffd700'; // Gold for major events
+            else if (type === 'system') p.style.color = '#ddeeff'; // Light blue
+            else if (type === 'system-critical') p.style.color = '#ff8888'; // Critical red
+            else if (type === 'enemy-action') p.style.color = '#ffcc88'; // Orange for enemy actions
+
+            // Prepend to keep newest messages at the top, but scroll to bottom
+            if (messageLog.firstChild) {
+                messageLog.insertBefore(p, messageLog.firstChild);
+            } else {
+                messageLog.appendChild(p);
+            }
+            // Keep only a certain number of messages
+            while (messageLog.children.length > 20) {
+                messageLog.removeChild(messageLog.lastChild);
+            }
+        }
+        
+        // --- Modal Functions ---
+        function openDungeonSelectionModal() {
+            dungeonListDiv.innerHTML = ''; // Clear previous list
+            unlockedDungeons.sort((a,b) => a-b).forEach(level => {
+                const btn = document.createElement('button');
+                btn.textContent = `Enter Dungeon Level ${level}`;
+                // Check if boss was defeated to show (Cleared)
+                if (dungeons[level-1] && dungeons[level-1].bossDefeated) {
+                     btn.textContent += " (Cleared)";
+                     btn.style.backgroundColor = "#777"; // Grey out cleared dungeons
+                }
+                btn.onclick = () => enterDungeon(level);
+                dungeonListDiv.appendChild(btn);
+            });
+            dungeonSelectionModal.style.display = 'flex';
+            gameState = 'paused'; // Pause game when modal is open
+        }
+
+        function closeDungeonSelectionModal() {
+            dungeonSelectionModal.style.display = 'none';
+            if (currentDungeonIndex === -1) gameState = 'hub'; // If was in hub
+            else gameState = 'dungeon'; // If was in dungeon
+        }
+        
+        function openMerchantModal(merchantType) {
+            const merchant = merchants[merchantType];
+            if (!merchant || !merchant.rescued) {
+                addLogMessage("This merchant hasn't been rescued yet!", "system");
+                return;
+            }
+            merchantNameUI.textContent = merchant.name + " " + merchant.emoji;
+            merchantInventoryUI.innerHTML = '';
+            merchant.inventory.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'p-2 my-1 border border-gray-600 rounded flex justify-between items-center';
+                itemDiv.innerHTML = `<span>${item.emoji} ${item.name} (${item.type === 'weapon' ? '+' + item.attackBonus + ' ATK' : item.type === 'armor' ? '+' + item.defenseBonus + ' DEF' : item.effect + ' ' + item.value}) - ${item.cost}💰</span>`;
+                const buyButton = document.createElement('button');
+                buyButton.textContent = 'Buy';
+                buyButton.className = 'bg-green-500 hover:bg-green-700 text-white py-1 px-2 rounded';
+                buyButton.onclick = () => buyItem(merchantType, item);
+                if (player.gold < item.cost) {
+                    buyButton.disabled = true;
+                    buyButton.className += ' opacity-50 cursor-not-allowed';
+                }
+                itemDiv.appendChild(buyButton);
+                merchantInventoryUI.appendChild(itemDiv);
+            });
+
+            modalPlayerGoldUI.textContent = player.gold;
+            merchantModal.style.display = 'flex';
+            gameState = 'merchant'; // Pause game for merchant interaction
+        }
+
+        function buyItem(merchantType, itemToBuy) {
+            if (player.gold >= itemToBuy.cost) {
+                player.gold -= itemToBuy.cost;
+                addLogMessage(`Bought ${itemToBuy.name} for ${itemToBuy.cost} gold.`, 'loot');
+                
+                if (itemToBuy.type === 'weapon') {
+                    player.equippedWeapon = {...itemToBuy}; // Equip it
+                } else if (itemToBuy.type === 'armor') {
+                    // player.equippedArmor = {...itemToBuy}; // Need to add armor slot
+                    addLogMessage("Armor slot not fully implemented yet.", "system");
+                } else if (itemToBuy.type === 'consumable') {
+                    player.inventory.push({...itemToBuy});
+                    addLogMessage(`${itemToBuy.name} added to inventory (use not implemented).`, "system");
+                }
+                // Refresh merchant modal to update gold and button states
+                openMerchantModal(merchantType); 
+                updateUI();
+            } else {
+                addLogMessage("Not enough gold!", "system-critical");
+            }
+        }
+
+        function closeMerchantModal() {
+            merchantModal.style.display = 'none';
+            if (currentDungeonIndex === -1) gameState = 'hub';
+            else gameState = 'dungeon';
+        }
+
+
+        // --- Input Handling ---
+        window.addEventListener('keydown', (e) => {
+            if (gameState === 'gameOver' || gameState === 'paused' || gameState === 'merchant' || screenFade.active) return; // Don't process input if game over, paused, or fading
+            if (player.isMoving) return; // Don't accept new input if already moving
+
+            let dx = 0;
+            let dy = 0;
+
+            switch (e.key.toLowerCase()) {
+                case 'w': case 'arrowup': dy = -1; break;
+                case 's': case 'arrowdown': dy = 1; break;
+                case 'a': case 'arrowleft': dx = -1; break;
+                case 'd': case 'arrowright': dx = 1; break;
+                case 'e': handleInteraction(); return; // Interaction handled, no movement
+            }
+
+            if (dx !== 0 || dy !== 0) {
+                const newX = player.x + dx;
+                const newY = player.y + dy;
+
+                // Check for enemy collision (attack)
+                const enemyAtNewPos = currentMap.enemies ? currentMap.enemies.find(enemy => enemy.x === newX && enemy.y === newY) : null;
+                if (enemyAtNewPos) {
+                    playerAttack(enemyAtNewPos);
+                    return; // Attack, don't move into enemy square
+                }
+
+                // Check for wall/boundary collision
+                if (newX >= 0 && newX < GRID_COLS && newY >= 0 && newY < GRID_ROWS &&
+                    currentMap.tiles[newY][newX] !== '#') {
+                    player.x = newX;
+                    player.y = newY;
+                    player.targetX = newX * TILE_SIZE;
+                    player.targetY = newY * TILE_SIZE;
+                    player.isMoving = true;
+                }
+            }
+        });
+
+        // --- Initialization ---
+        function init() {
+            player = createPlayer();
+            initializeMerchants();
+            currentMap = createHubMap();
+            updateUI();
+            lastTimestamp = performance.now();
+            gameLoop(lastTimestamp);
+        }
+
+        init();
+
+    </script>
+</body>
+</html>

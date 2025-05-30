@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Czech Hockey Rampage - Arena Sprites</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom CSS for the game */
+        body {
+            font-family: 'Inter', 'Arial', sans-serif;
+            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile */
+        }
+
+        #game-wrapper {
+            background-color: #1a202c; /* Dark background for the game area */
+            touch-action: none; /* Disable default touch actions like pinch-zoom on the game area */
+        }
+
+        canvas {
+            display: block;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .health-bar-fill-p1 { background-color: #48bb78; /* Green for Player 1 */ }
+        .health-bar-fill-p2 { background-color: #4299e1; /* Blue for Player 2 */ }
+        .health-bar-fill-enemy { background-color: #f56565; /* Red for Enemy */ }
+
+        #continue-prompt {
+            animation: pulse 1.5s infinite;
+            text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #007bff;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.05); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        /* Styling for on-screen controls for mobile */
+        .mobile-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 100;
+            pointer-events: none; 
+        }
+        .control-cluster {
+            display: grid;
+            grid-template-areas: ". up ." "left . right" ". down .";
+            gap: 10px;
+            pointer-events: auto; 
+        }
+        .control-button {
+            width: 50px;
+            height: 50px;
+            background-color: rgba(0,0,0,0.5);
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            font-weight: bold;
+            user-select: none; 
+            cursor: pointer;
+        }
+        .control-button:active {
+            background-color: rgba(255,255,255,0.5);
+            color: black;
+        }
+        .control-button.up { grid-area: up; }
+        .control-button.down { grid-area: down; }
+        .control-button.left { grid-area: left; }
+        .control-button.right { grid-area: right; }
+        .action-button {
+            width: 70px;
+            height: 70px;
+            background-color: rgba(200,0,0,0.6);
+            pointer-events: auto; 
+        }
+         .action-button-p2 {
+            background-color: rgba(0,0,200,0.6);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 flex items-center justify-center min-h-screen overflow-hidden">
+    <div id="game-wrapper" class="relative w-full max-w-5xl aspect-[16/9] shadow-2xl rounded-lg overflow-hidden border-4 border-gray-700">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="player1-ui" class="absolute top-4 left-4 bg-black bg-opacity-60 p-3 rounded-lg text-white shadow-lg">
+            <div class="font-bold text-lg">P1: Jágr <span class="text-red-400"></span></div>
+            <div class="w-40 h-5 bg-gray-700 rounded mt-1 border-2 border-gray-500 overflow-hidden">
+                <div id="player1-health-fill" class="h-full health-bar-fill-p1 rounded-sm transition-all duration-200" style="width: 100%;"></div>
+            </div>
+            <div id="player1-powerup" class="text-sm mt-1 text-yellow-300 font-semibold"></div>
+        </div>
+
+        <div id="player2-ui" class="absolute top-4 right-4 bg-black bg-opacity-60 p-3 rounded-lg text-white text-right shadow-lg">
+            <div class="font-bold text-lg">P2: Eliáš <span class="text-blue-400"></span></div>
+            <div class="w-40 h-5 bg-gray-700 rounded mt-1 border-2 border-gray-500 ml-auto overflow-hidden">
+                <div id="player2-health-fill" class="h-full health-bar-fill-p2 rounded-sm transition-all duration-200" style="width: 100%;"></div>
+            </div>
+            <div id="player2-powerup" class="text-sm mt-1 text-yellow-300 font-semibold"></div>
+        </div>
+
+        <div id="message-box-container" class="absolute inset-0 flex items-center justify-center hidden bg-black bg-opacity-75 z-50 p-4">
+            <div class="bg-gray-800 p-8 rounded-lg shadow-xl text-center text-white border-2 border-blue-500">
+                <p id="message-text" class="text-2xl mb-6"></p>
+                <button id="message-ok-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-400">OK</button>
+            </div>
+        </div>
+
+        <div id="game-over-screen" class="absolute inset-0 flex flex-col items-center justify-center hidden bg-red-900 bg-opacity-90 z-50 text-white p-4">
+            <h2 class="text-6xl font-bold mb-6 text-red-300" style="text-shadow: 2px 2px 4px #000;">GAME OVER</h2>
+            <p id="game-over-message" class="text-2xl mb-10">The Swedes were too strong today.</p>
+            <button id="restart-button-gameover" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-4 px-8 rounded-lg text-xl focus:outline-none focus:ring-2 focus:ring-yellow-300">Try Again</button>
+        </div>
+
+        <div id="victory-screen" class="absolute inset-0 flex flex-col items-center justify-center hidden bg-yellow-500 bg-opacity-90 z-50 text-black p-4">
+            <h2 class="text-6xl font-bold mb-6 text-yellow-900" style="text-shadow: 2px 2px #fff;">VICTORY!</h2>
+            <p class="text-2xl mb-10">The Czechs are champions!</p>
+            <button id="restart-button-victory" class="bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-lg text-xl focus:outline-none focus:ring-2 focus:ring-green-300">Play Again</button>
+        </div>
+
+        <div id="continue-prompt" class="absolute top-1/2 right-10 transform -translate-y-1/2 text-white text-4xl font-bold hidden z-40">
+            CONTINUE →
+        </div>
+
+        <div id="mobile-controls-container" class="mobile-controls">
+            <div class="control-cluster">
+                <button id="p1-up" class="control-button up">↑</button>
+                <button id="p1-left" class="control-button left">←</button>
+                <button id="p1-right" class="control-button right">→</button>
+                <button id="p1-down" class="control-button down">↓</button>
+            </div>
+            <button id="p1-action" class="control-button action-button">🏒</button>
+            <button id="p2-action" class="control-button action-button action-button-p2">🥅</button>
+            <div class="control-cluster">
+                <button id="p2-up" class="control-button up">↑</button>
+                <button id="p2-left" class="control-button left">←</button>
+                <button id="p2-right" class="control-button right">→</button>
+                <button id="p2-down" class="control-button down">↓</button>
+            </div>
+        </div>
+    </div>
+
+    <audio id="background-music" loop preload="auto">
+        <source src="https://cdn1.suno.ai/5751e7c1-4b86-4f91-b6c0-a2dbf4e1ecdd.mp3" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <audio id="sfx-death" preload="auto">
+        <source src="https://cdn.freesound.org/sounds/648/648976-b2b26199-aeb7-4cea-b619-f88b38790a3d?filename=648976__atomediadesign__oh-ouch.wav" type="audio/wav">
+    </audio>
+    <audio id="sfx-wave-cleared" preload="auto">
+        <source src="https://cdn.freesound.org/sounds/689/689134-9a454ce2-da97-440b-813a-cb4e119985dd?filename=689134__moulaythami__cheers-a.wav" type="audio/wav">
+    </audio>
+    <audio id="sfx-attack" preload="auto">
+        <source src="https://cdn.freesound.org/sounds/425/425704-e45eaaba-d7c5-4553-aab8-3e314a79a6c3?filename=425704__moogy73__woosh_low_short_01.wav" type="audio/wav">
+    </audio>
+
+
+    <script>
+        // IIFE to encapsulate game logic
+        (function() {
+            // DOM Elements
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const p1HealthFill = document.getElementById('player1-health-fill');
+            const p2HealthFill = document.getElementById('player2-health-fill');
+            const p1PowerupText = document.getElementById('player1-powerup');
+            const p2PowerupText = document.getElementById('player2-powerup');
+            const messageBoxContainer = document.getElementById('message-box-container');
+            const messageText = document.getElementById('message-text');
+            const messageOkButton = document.getElementById('message-ok-button');
+            const gameOverScreen = document.getElementById('game-over-screen');
+            const victoryScreen = document.getElementById('victory-screen');
+            const continuePrompt = document.getElementById('continue-prompt');
+            const restartButtonGameOver = document.getElementById('restart-button-gameover');
+            const restartButtonVictory = document.getElementById('restart-button-victory');
+            const mobileControlsContainer = document.getElementById('mobile-controls-container');
+            const p1Up = document.getElementById('p1-up');
+            const p1Left = document.getElementById('p1-left');
+            const p1Right = document.getElementById('p1-right');
+            const p1Down = document.getElementById('p1-down');
+            const p1Action = document.getElementById('p1-action');
+            const p2Up = document.getElementById('p2-up');
+            const p2Left = document.getElementById('p2-left');
+            const p2Right = document.getElementById('p2-right');
+            const p2Down = document.getElementById('p2-down');
+            const p2Action = document.getElementById('p2-action');
+            const backgroundMusic = document.getElementById('background-music'); 
+            const sfxDeath = document.getElementById('sfx-death');
+            const sfxWaveCleared = document.getElementById('sfx-wave-cleared');
+            const sfxAttack = document.getElementById('sfx-attack');
+
+
+            // Game Constants
+            const CANVAS_WIDTH = 1000;
+            const CANVAS_HEIGHT = 562.5; 
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT;
+
+            const PLAYER_WIDTH = 60; 
+            const PLAYER_HEIGHT = 80; 
+            const PLAYER_SPEED = 200; 
+            const PLAYER_HEALTH = 100;
+            const MELEE_ATTACK_DAMAGE = 20;
+            const RANGED_ATTACK_DAMAGE = 15;
+            const PUCK_SPEED = 400;
+            const ATTACK_COOLDOWN = 0.5; 
+            const MELEE_ATTACK_DURATION = 0.2; 
+            const ATTACK_ANIMATION_DURATION = 0.2; 
+            const MELEE_RANGE = 40; 
+
+            const ENEMY_WIDTH = 60; 
+            const ENEMY_HEIGHT = 80; 
+            const SWEDISH_HEALTH = 60;
+            const REFEREE_HEALTH = 100;
+            const GOALIE_HEALTH = 300;
+            const ENEMY_SPEED = 100;
+            const REFEREE_SPEED = 80; 
+            const ENEMY_ATTACK_DAMAGE = 10;
+            const ENEMY_ATTACK_RANGE = 35; 
+            const ENEMY_ATTACK_COOLDOWN = 1.5;
+            const ENEMY_TARGET_SWITCH_INTERVAL = 3; 
+            const HIT_FLASH_DURATION = 0.15; 
+
+            const POWERUP_DURATION = 15; 
+            const POWERUP_SIZE = 30; 
+
+            const ICE_TOP_PERCENTAGE = 0.42; 
+            const ICE_BOTTOM_PERCENTAGE = 0.93; 
+            let MIN_Y_POS, MAX_Y_POS; 
+
+            // Game State
+            let players = [];
+            let enemies = []; 
+            let activeEnemies = []; 
+            let projectiles = [];
+            let powerUps = [];
+            let keys = {};
+            let cameraX = 0;
+            let worldScrollX = 0; 
+            let screenLock = false; 
+            let gameState = 'START'; 
+            let currentWaveIndex = -1; 
+            let waveTriggeredFlags = []; 
+            let lastTime = 0;
+            let gameStarted = false;
+            let continuePromptTimeout = null; 
+            let currentWaveActive = false; 
+            let allEnemiesOnScreenForCurrentWave = false;
+            let musicPlaying = false; 
+            let audioUnlocked = false; 
+
+
+            // Sprite Image Loading
+            let imagesToLoad = 9; 
+            let imagesLoaded = 0;
+            function onImageLoad() { imagesLoaded++; if (imagesLoaded === imagesToLoad) { allImagesLoaded = true; console.log("All images loaded successfully."); } }
+            function onImageError(e) { console.error("Error loading an image: ", e.target.src); onImageLoad(); } 
+            let allImagesLoaded = false;
+            const backgroundImage = new Image(); backgroundImage.onload = onImageLoad; backgroundImage.onerror = onImageError; backgroundImage.src = 'https://i.imgur.com/juPgqoC.jpg';
+            const playerSprite = new Image(); playerSprite.onload = onImageLoad; playerSprite.onerror = onImageError; playerSprite.src = 'https://i.imgur.com/vTRHgMo.png'; 
+            const enemySprite = new Image(); enemySprite.onload = onImageLoad; enemySprite.onerror = onImageError; enemySprite.src = 'https://i.imgur.com/X3OZx85.png';   
+            const refereeSprite = new Image(); refereeSprite.onload = onImageLoad; refereeSprite.onerror = onImageError; refereeSprite.src = 'https://i.imgur.com/z9Lx5Pw.png'; 
+            const goalieSprite = new Image(); goalieSprite.onload = onImageLoad; goalieSprite.onerror = onImageError; goalieSprite.src = 'https://i.imgur.com/MksVyQu.png'; 
+            const player1AttackSprite = new Image(); player1AttackSprite.onload = onImageLoad; player1AttackSprite.onerror = onImageError; player1AttackSprite.src = 'https://i.imgur.com/zorT4NY.png';
+            const player2AttackSprite = new Image(); player2AttackSprite.onload = onImageLoad; player2AttackSprite.onerror = onImageError; player2AttackSprite.src = 'https://i.imgur.com/NWdL5DF.png';
+            const enemyAttackSprite = new Image(); enemyAttackSprite.onload = onImageLoad; enemyAttackSprite.onerror = onImageError; enemyAttackSprite.src = 'https://i.imgur.com/bWE8Ocn.png'; 
+            const goalieAttackSprite = new Image(); goalieAttackSprite.onload = onImageLoad; goalieAttackSprite.onerror = onImageError; goalieAttackSprite.src = 'https://i.imgur.com/4LvboD9.png'; 
+            const PUCK_EMOJI = '⚫';
+
+            // Level Definition
+            const levelManager = {
+                worldWidth: 4000,
+                waves: [ 
+                    { scrollTriggerX: 0, enemies: [{ type: 'swedish', count: 2, spawnXOffset: 200 }] }, 
+                    { scrollTriggerX: 600, enemies: [{ type: 'swedish', count: 3, spawnXOffset: 200 }] },
+                    { scrollTriggerX: 1300, enemies: [{ type: 'swedish', count: 2, spawnXOffset: 150 }, { type: 'swedish', count: 2, spawnXOffset: 300 }] },
+                    { scrollTriggerX: 2000, enemies: [{ type: 'referee', count: 1, spawnXOffset: 200 }], isRefereeWave: true },
+                    { scrollTriggerX: 2700, enemies: [{ type: 'swedish', count: 4, spawnXOffset: 200 }] },
+                    { scrollTriggerX: 3400, enemies: [{ type: 'goalie_boss', count: 1, spawnXOffset: 250 }], isBossWave: true }
+                ]
+            };
+
+            // Utility Functions
+            function randomBetween(min, max) { return Math.random() * (max - min) + min; }
+            function checkCollision(rect1, rect2) { if (!rect1 || !rect2) return false; return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x && rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y; }
+
+            function playSound(soundElement, soundName = "SFX") {
+                if (!audioUnlocked) {
+                    unlockAndInitializeAudio(); 
+                    return; 
+                }
+                if (soundElement) {
+                    soundElement.currentTime = 0; 
+                    soundElement.play()
+                        .then(() => { /* console.log(`${soundName} played successfully.`); */ })
+                        .catch(error => console.warn(`Sound play FAILED for ${soundName}: ${error.name} - ${error.message}`));
+                } else {
+                    console.warn(`Sound element for ${soundName} not found.`);
+                }
+            }
+            
+            function unlockAndInitializeAudio() {
+                if (audioUnlocked) return; 
+
+                console.log("Attempting to unlock and prime audio...");
+                let promises = [];
+                const allAudioElements = [backgroundMusic, sfxDeath, sfxAttack, sfxWaveCleared];
+
+                allAudioElements.forEach(audioEl => {
+                    if (audioEl) {
+                        audioEl.load(); 
+                        const currentVolume = audioEl.volume; 
+                        audioEl.muted = true;
+                        const promise = audioEl.play()
+                            .then(() => {
+                                audioEl.pause();
+                                audioEl.currentTime = 0;
+                                audioEl.muted = false; 
+                                audioEl.volume = currentVolume; 
+                            })
+                            .catch(e => {
+                                audioEl.muted = false; 
+                                audioEl.volume = currentVolume;
+                            });
+                        promises.push(promise);
+                    }
+                });
+
+                Promise.allSettled(promises).then(() => { 
+                    audioUnlocked = true;
+                    console.log("Audio context likely unlocked and SFX primed (or attempted).");
+                    if (backgroundMusic && backgroundMusic.paused && !musicPlaying) {
+                        console.log("Attempting to play background music after priming.");
+                        backgroundMusic.muted = false; 
+                        backgroundMusic.play().then(() => {
+                            musicPlaying = true;
+                            console.log("Background music started after priming.");
+                        }).catch(error => {
+                            console.warn("Music autoplay still prevented after priming.", error);
+                        });
+                    }
+                });
+            }
+
+
+            // Entity Classes
+            class Entity { 
+                constructor(x, y, width, height, health, type, color = 'gray') { 
+                    this.x = x; this.y = y; this.width = width; this.height = height; 
+                    this.health = health; this.maxHealth = health; this.type = type; this.color = color; 
+                    this.isAlive = true; this.attackCooldownTimer = 0; 
+                    this.facingRight = (this instanceof Player); 
+                    this.speed = 0; 
+                    this.isHit = false; 
+                    this.hitFlashTimer = 0; 
+                }
+                draw(ctx, cameraX) {
+                    if (!this.isAlive && !this.isHit) return; 
+                    const drawX = this.x - cameraX; const drawY = this.y;
+                    let spriteToDraw = null; 
+                    let spriteWidth = this.width; 
+                    let spriteHeight = this.height;
+                    
+                    if (this instanceof Player) {
+                        spriteToDraw = this.isPerformingAttackAnimation ? 
+                                       (this.playerType === 'melee' ? player1AttackSprite : player2AttackSprite) 
+                                       : playerSprite;
+                    } else if (this instanceof Enemy) {
+                        if (this.isPerformingAttackAnimation) {
+                            if (this.type === 'swedish') spriteToDraw = enemyAttackSprite;
+                            else if (this.type === 'goalie_boss') spriteToDraw = goalieAttackSprite;
+                            else spriteToDraw = refereeSprite; 
+                        } else { 
+                            if (this.type === 'swedish') spriteToDraw = enemySprite;
+                            else if (this.type === 'referee') spriteToDraw = refereeSprite;
+                            else if (this.type === 'goalie_boss') spriteToDraw = goalieSprite;
+                        }
+                    }
+                    else if (this.type === 'puck') { ctx.font = `${this.height}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(PUCK_EMOJI, drawX + this.width / 2, drawY + this.height / 2); return; } 
+                    else if (this.type === 'powerup') { ctx.font = `${this.height*0.9}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const powerupEmoji = this.powerUpType === 'health_boost' ? '➕' : '⚡️'; ctx.fillText(powerupEmoji, drawX + this.width / 2, drawY + this.height / 2); return; }
+
+                    // --- Sprite Drawing and Hit Flash Logic ---
+                    if ((this.isAlive || this.isHit) && spriteToDraw && spriteToDraw.complete && spriteToDraw.naturalWidth !== 0) { 
+                        let flip = false;
+                        if (this instanceof Player) { 
+                            if (!this.facingRight) flip = true; 
+                        } else { 
+                            if (this.facingRight) flip = true; 
+                        }
+
+                        if (this.isHit) {
+                            // Create a temporary canvas for the tinted sprite
+                            const tempCanvas = document.createElement('canvas');
+                            tempCanvas.width = spriteWidth;
+                            tempCanvas.height = spriteHeight;
+                            const tempCtx = tempCanvas.getContext('2d');
+
+                            // Draw the original sprite (flipped if needed) onto the temporary canvas
+                            if (flip) {
+                                tempCtx.save();
+                                tempCtx.translate(spriteWidth, 0);
+                                tempCtx.scale(-1, 1);
+                                tempCtx.drawImage(spriteToDraw, 0, 0, spriteWidth, spriteHeight);
+                                tempCtx.restore();
+                            } else {
+                                tempCtx.drawImage(spriteToDraw, 0, 0, spriteWidth, spriteHeight);
+                            }
+
+                            // Apply tint on the temporary canvas
+                            tempCtx.globalCompositeOperation = 'source-atop';
+                            tempCtx.fillStyle = 'rgba(255, 0, 0, 0.5)'; 
+                            tempCtx.fillRect(0, 0, spriteWidth, spriteHeight);
+                            // No need to reset globalCompositeOperation for tempCtx if it's discarded
+
+                            // Draw the tinted sprite from the temporary canvas to the main canvas
+                            ctx.drawImage(tempCanvas, drawX, drawY, spriteWidth, spriteHeight);
+                        } else if (this.isAlive) { // Draw normal sprite if alive and not hit-flashing
+                            if (flip) {
+                                ctx.save();
+                                ctx.translate(drawX + spriteWidth, drawY); 
+                                ctx.scale(-1, 1); 
+                                ctx.drawImage(spriteToDraw, 0, 0, spriteWidth, spriteHeight); 
+                                ctx.restore();
+                            } else { 
+                                ctx.drawImage(spriteToDraw, drawX, drawY, spriteWidth, spriteHeight);
+                            }
+                        }
+                    } else if ((this.isAlive || this.isHit) && !spriteToDraw) { // Fallback for non-sprite entities
+                        ctx.fillStyle = this.color; 
+                        ctx.fillRect(drawX, drawY, this.width, this.height); 
+                        if (this.isHit) { // Apply flash to fallback shape too
+                            ctx.save();
+                            ctx.globalCompositeOperation = 'source-atop';
+                            ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                            ctx.fillRect(drawX, drawY, this.width, this.height);
+                            ctx.restore();
+                        }
+                    }
+                    // --- End Sprite Drawing and Hit Flash Logic ---
+                    
+                    if (this.isAlive && this instanceof Enemy && this.health < this.maxHealth) { 
+                        const barWidth = this.width * 0.8; const barHeight = 8; 
+                        const barX = drawX + (this.width - barWidth) / 2; 
+                        const barY = drawY - barHeight - 5; 
+                        ctx.fillStyle = '#333'; ctx.fillRect(barX, barY, barWidth, barHeight); 
+                        const healthPercentage = this.health / this.maxHealth; 
+                        ctx.fillStyle = '#f56565'; ctx.fillRect(barX, barY, barWidth * healthPercentage, barHeight); 
+                        ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(barX, barY, barWidth, barHeight); 
+                    }
+                }
+                takeDamage(amount) { 
+                    if (!this.isAlive) return; 
+
+                    this.health -= amount; 
+                    this.isHit = true; 
+                    this.hitFlashTimer = HIT_FLASH_DURATION;
+
+                    if (this.health <= 0) { 
+                        this.health = 0; 
+                        if (this.isAlive) { 
+                           console.log(`${this.type} died. Playing death sound.`);
+                           playSound(sfxDeath, "Death");
+                        }
+                        // isAlive will be set to false in update after flash
+                        if (this.type === 'referee') {
+                            console.log(`Referee (type: ${this.type}) defeated at world X: ${this.x}. Spawning power-ups.`);
+                            spawnPowerUpsAt(this.x + this.width / 2, this.y + this.height / 2);
+                        }
+                    } 
+                }
+                update(deltaTime) { 
+                    if (this.attackCooldownTimer > 0) { this.attackCooldownTimer -= deltaTime; } 
+                    
+                    if (this.isPerformingAttackAnimation) {
+                        this.attackAnimationTimer -= deltaTime;
+                        if (this.attackAnimationTimer <= 0) {
+                            this.isPerformingAttackAnimation = false;
+                        }
+                    }
+                    if (this.isHit) {
+                        this.hitFlashTimer -= deltaTime;
+                        if (this.hitFlashTimer <= 0) {
+                            this.isHit = false;
+                            if (this.health <= 0) { 
+                                this.isAlive = false;
+                            }
+                        }
+                    }
+                }
+            }
+            class Player extends Entity { 
+                constructor(x, y, controlKeys, attackKey, playerType) { 
+                    super(x, y, PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_HEALTH, 'player'); 
+                    this.controlKeys = controlKeys; this.attackKey = attackKey; this.playerType = playerType; 
+                    this.speed = PLAYER_SPEED; 
+                    this.isAttacking = false; 
+                    this.attackDurationTimer = 0; 
+                    this.isPerformingAttackAnimation = false; 
+                    this.attackAnimationTimer = 0; 
+                    this.attackDamage = (playerType === 'melee') ? MELEE_ATTACK_DAMAGE : RANGED_ATTACK_DAMAGE; 
+                    this.baseAttackDamage = this.attackDamage; this.powerUpActive = false; this.powerUpTimer = 0; 
+                    this.attackHitbox = { x: 0, y: 0, width: 0, height: 0 }; 
+                    this.facingRight = true; 
+                }
+                handleInput(keys, deltaTime) { 
+                    if (!this.isAlive) return; 
+                    let dx = 0; let dy = 0;
+                    if (keys[this.controlKeys.left]) { dx -= this.speed * deltaTime; this.facingRight = false; }
+                    if (keys[this.controlKeys.right]) { dx += this.speed * deltaTime; this.facingRight = true; }
+                    if (keys[this.controlKeys.up]) { dy -= this.speed * deltaTime; }
+                    if (keys[this.controlKeys.down]) { dy += this.speed * deltaTime; }
+                    if (dx !== 0 && dy !== 0) { const factor = Math.sqrt(2) / 2; dx *= factor; dy *= factor; }
+                    
+                    let nextX = this.x + dx;
+                    nextX = Math.max(cameraX + 10, nextX); 
+                    if (screenLock) { nextX = Math.min(nextX, worldScrollX - this.width - 10); } 
+                    else { nextX = Math.min(nextX, cameraX + CANVAS_WIDTH - this.width - 10); } 
+                    this.x = Math.max(0, Math.min(levelManager.worldWidth - this.width, nextX)); 
+
+                    this.y += dy;
+                    this.y = Math.max(MIN_Y_POS, this.y); this.y = Math.min(MAX_Y_POS, this.y); 
+                    if (keys[this.attackKey] && this.attackCooldownTimer <= 0) { this.attack(); }
+                }
+                attack() { 
+                    if (this.isPerformingAttackAnimation && this.attackAnimationTimer > 0) return; 
+                    playSound(sfxAttack, "Player Attack");
+                    this.isAttacking = true; 
+                    this.isPerformingAttackAnimation = true;
+                    this.attackAnimationTimer = ATTACK_ANIMATION_DURATION;
+                    this.attackCooldownTimer = ATTACK_COOLDOWN; 
+
+                    if (this.playerType === 'melee') { 
+                        this.attackDurationTimer = MELEE_ATTACK_DURATION; 
+                        const attackX = this.facingRight ? this.x + this.width : this.x - MELEE_RANGE; 
+                        this.attackHitbox = { x: attackX, y: this.y + this.height / 4, width: MELEE_RANGE, height: this.height / 2 }; 
+                        activeEnemies.forEach(enemy => { if (enemy.isAlive && checkCollision(this.attackHitbox, enemy)) { enemy.takeDamage(this.attackDamage); } }); 
+                    } 
+                    else if (this.playerType === 'ranged') { 
+                        const puckY = this.y + this.height / 2 - (15/2); 
+                        const puckX = this.facingRight ? this.x + this.width : this.x - 15; 
+                        projectiles.push(new Projectile(puckX, puckY, this.facingRight ? 1 : -1, this.attackDamage, this)); 
+                    } 
+                }
+                update(deltaTime) { 
+                    super.update(deltaTime); 
+                    if (this.isAttacking && this.playerType === 'melee') { 
+                        this.attackDurationTimer -= deltaTime; 
+                        if (this.attackDurationTimer <= 0) { this.isAttacking = false; } 
+                    }
+                    if (this.powerUpActive) { this.powerUpTimer -= deltaTime; if (this.powerUpTimer <= 0) { this.powerUpActive = false; this.attackDamage = this.baseAttackDamage; if (this === players[0]) p1PowerupText.textContent = ''; else p2PowerupText.textContent = ''; } } 
+                }
+                draw(ctx, cameraX) { 
+                    super.draw(ctx, cameraX); 
+                }
+                applyPowerUp(type) { if (type === 'health_boost') { this.health = Math.min(this.maxHealth, this.health + this.maxHealth * 0.5); } else if (type === 'damage_boost') { this.powerUpActive = true; this.powerUpTimer = POWERUP_DURATION; this.attackDamage = this.baseAttackDamage * 1.5; const powerupText = `Damage Up! ${Math.ceil(this.powerUpTimer)}s`; if (this === players[0]) p1PowerupText.textContent = powerupText; else p2PowerupText.textContent = powerupText; } }
+            }
+            class Enemy extends Entity { 
+                constructor(x, y, health, enemyType, speed = ENEMY_SPEED) { 
+                    let width = ENEMY_WIDTH; let height = ENEMY_HEIGHT; 
+                    if (enemyType === 'goalie_boss') { width *= 1.5; height *= 1.5; } 
+                    super(x, y, width, height, health, enemyType); 
+                    this.speed = (enemyType === 'referee') ? REFEREE_SPEED : speed; 
+                    this.targetPlayer = null; 
+                    this.randomPatrolTarget = { x: this.x, y: this.y }; 
+                    this.attackRange = ENEMY_ATTACK_RANGE;
+                    this.attackDamage = (enemyType === 'goalie_boss') ? ENEMY_ATTACK_DAMAGE * 2 : ENEMY_ATTACK_DAMAGE;
+                    this.targetSelectionTimer = randomBetween(0, ENEMY_TARGET_SWITCH_INTERVAL); 
+                    this.facingRight = false; 
+                    this.isPerformingAttackAnimation = false; 
+                    this.attackAnimationTimer = 0;         
+                }
+                selectTarget(playersToTarget) { 
+                    const alivePlayers = playersToTarget.filter(p => p.isAlive);
+                    if (alivePlayers.length > 0) {
+                        this.targetPlayer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+                    } else {
+                        this.targetPlayer = null;
+                    }
+                }
+                update(deltaTime, playersToTarget, cameraX) { 
+                    super.update(deltaTime); 
+                    if (!this.isAlive) return;
+
+                    this.targetSelectionTimer -= deltaTime;
+
+                    if (this.type === 'referee') {
+                        if (this.targetSelectionTimer <= 0) {
+                            this.randomPatrolTarget.x = cameraX + randomBetween(this.width, CANVAS_WIDTH - this.width);
+                            this.randomPatrolTarget.y = randomBetween(MIN_Y_POS, MAX_Y_POS);
+                            this.targetSelectionTimer = ENEMY_TARGET_SWITCH_INTERVAL;
+                        }
+
+                        const dxToPatrol = this.randomPatrolTarget.x - this.x;
+                        const dyToPatrol = this.randomPatrolTarget.y - this.y;
+                        const distanceToPatrol = Math.sqrt(dxToPatrol*dxToPatrol + dyToPatrol*dyToPatrol);
+
+                        if (distanceToPatrol > this.speed * deltaTime * 0.5) { 
+                            const moveX = (dxToPatrol / distanceToPatrol) * this.speed * deltaTime;
+                            const moveY = (dyToPatrol / distanceToPatrol) * this.speed * deltaTime;
+                            this.x += moveX;
+                            this.y += moveY;
+                            if (Math.abs(moveX) > 0.1) { 
+                                this.facingRight = moveX > 0;
+                            }
+                        } else {
+                            this.targetSelectionTimer = 0;
+                        }
+
+                    } else { 
+                        if (this.targetSelectionTimer <= 0) {
+                            this.selectTarget(playersToTarget);
+                            this.targetSelectionTimer = ENEMY_TARGET_SWITCH_INTERVAL;
+                        }
+
+                        if (this.targetPlayer && this.targetPlayer.isAlive) {
+                            const dxToPlayer = this.targetPlayer.x - this.x;
+                            const dyToPlayer = this.targetPlayer.y - this.y;
+                            const distanceToPlayer = Math.sqrt(dxToPlayer * dxToPlayer + dyToPlayer * dyToPlayer);
+
+                            this.facingRight = dxToPlayer > 0; 
+
+                            if (distanceToPlayer < this.attackRange && !this.isPerformingAttackAnimation) { 
+                                if (this.attackCooldownTimer <= 0) {
+                                    this.attackPlayer(this.targetPlayer);
+                                }
+                            } else if (!this.isPerformingAttackAnimation) { 
+                                const moveX = (dxToPlayer / distanceToPlayer) * this.speed * deltaTime;
+                                const moveY = (dyToPlayer / distanceToPlayer) * this.speed * deltaTime;
+                                this.x += moveX;
+                                this.y += moveY;
+                            }
+                        } else {
+                            if (!this.targetPlayer || !this.targetPlayer.isAlive) {
+                                 this.selectTarget(playersToTarget); 
+                            }
+                        }
+                    }
+                    
+                    this.x = Math.max(cameraX, this.x); 
+                    this.x = Math.min(cameraX + CANVAS_WIDTH - this.width, this.x); 
+                    this.y = Math.max(MIN_Y_POS, this.y); 
+                    this.y = Math.min(MAX_Y_POS, this.y); 
+                }
+                attackPlayer(player) { 
+                    if (this.type === 'referee') return; 
+
+                    playSound(sfxAttack, `${this.type} Attack`);
+                    this.attackCooldownTimer = ENEMY_ATTACK_COOLDOWN; 
+                    this.isPerformingAttackAnimation = true; 
+                    this.attackAnimationTimer = ATTACK_ANIMATION_DURATION;
+                    
+                    if (checkCollision(this, player)) { player.takeDamage(this.attackDamage); } 
+                }
+            }
+            class Projectile extends Entity { 
+                 constructor(x, y, direction, damage, owner) { super(x, y, 15, 15, 1, 'puck'); this.direction = direction; this.damage = damage; this.speed = PUCK_SPEED; this.owner = owner; }
+                update(deltaTime, cameraX) { this.x += this.direction * this.speed * deltaTime; activeEnemies.forEach(enemy => { if (enemy.isAlive && checkCollision(this, enemy)) { enemy.takeDamage(this.damage); this.isAlive = false; } }); if (this.x < cameraX - this.width || this.x > cameraX + CANVAS_WIDTH) { this.isAlive = false; } }
+            }
+            class PowerUp extends Entity { 
+                constructor(x, y, powerUpType) { super(x, y, POWERUP_SIZE, POWERUP_SIZE, 1, 'powerup'); this.powerUpType = powerUpType; this.spawnTime = Date.now(); this.duration = 20 * 1000; }
+                update(deltaTime) { if (Date.now() - this.spawnTime > this.duration) { this.isAlive = false; } }
+            }
+
+            // Game Initialization
+            function initGame() { 
+                MIN_Y_POS = CANVAS_HEIGHT * ICE_TOP_PERCENTAGE; MAX_Y_POS = CANVAS_HEIGHT * ICE_BOTTOM_PERCENTAGE - PLAYER_HEIGHT; 
+                const initialPlayerY = MAX_Y_POS; 
+                players = [ new Player(100, initialPlayerY, { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }, 'Space', 'melee'), new Player(150, initialPlayerY, { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' }, 'Enter', 'ranged') ];
+                enemies = []; activeEnemies = []; projectiles = []; powerUps = []; keys = {};
+                cameraX = 0; worldScrollX = CANVAS_WIDTH; 
+                screenLock = false; 
+                currentWaveActive = false;
+                allEnemiesOnScreenForCurrentWave = false;
+                gameState = 'PLAYING'; currentWaveIndex = -1;
+                waveTriggeredFlags = levelManager.waves.map(() => false);
+                lastTime = performance.now(); gameStarted = true;
+                p1PowerupText.textContent = ''; p2PowerupText.textContent = '';
+                updateHealthUI(); hideScreens(); 
+                checkAndSpawnWave(); 
+                if (isMobile()) { mobileControlsContainer.classList.remove('hidden'); } else { mobileControlsContainer.classList.add('hidden'); }
+            }
+            
+            function isMobile() { return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent); }
+
+            // UI Functions
+            function updateHealthUI() { if (players.length > 0 && players[0]) { p1HealthFill.style.width = `${(players[0].health / players[0].maxHealth) * 100}%`;} if (players.length > 1 && players[1]) { p2HealthFill.style.width = `${(players[1].health / players[1].maxHealth) * 100}%`;}}
+            function showMessage(msg, onOkCallback) { 
+                messageText.textContent = msg; 
+                messageBoxContainer.classList.remove('hidden'); 
+                messageOkButton.onclick = () => { 
+                    messageBoxContainer.classList.add('hidden'); 
+                    if (onOkCallback) onOkCallback(); 
+                    unlockAndInitializeAudio(); 
+                };
+            }
+            function hideScreens() { gameOverScreen.classList.add('hidden'); victoryScreen.classList.add('hidden'); messageBoxContainer.classList.add('hidden'); }
+            function showGameOver() { gameState = 'GAME_OVER'; gameOverScreen.classList.remove('hidden'); }
+            function showVictory() { gameState = 'VICTORY'; victoryScreen.classList.remove('hidden'); }
+            function showContinuePrompt(show) { if (continuePromptTimeout) { clearTimeout(continuePromptTimeout); continuePromptTimeout = null; } if (show) { continuePrompt.classList.remove('hidden'); } else { continuePrompt.classList.add('hidden'); }}
+
+            // Level and Wave Management
+            function checkAndSpawnWave() { 
+                if (currentWaveActive) { return; }
+                const nextWavePotentialIndex = currentWaveIndex + 1;
+                if (nextWavePotentialIndex < levelManager.waves.length && !waveTriggeredFlags[nextWavePotentialIndex]) {
+                    const averagePlayerX = (players.length > 0 ? (players[0].x + (players[1] ? players[1].x : players[0].x)) / (players[1] ? 2 : 1) : 0);
+                    const worldPlayerX = averagePlayerX + cameraX; 
+                    if (worldPlayerX >= levelManager.waves[nextWavePotentialIndex].scrollTriggerX) {
+                        console.log(`Triggering wave ${nextWavePotentialIndex + 1} (index ${nextWavePotentialIndex})`);
+                        spawnWave(nextWavePotentialIndex); 
+                    }
+                }
+            }
+
+            function spawnWave(waveIdxToSpawn) { 
+                console.log(`Spawning wave ${waveIdxToSpawn + 1}. Current cameraX: ${cameraX}`);
+                currentWaveIndex = waveIdxToSpawn; 
+                const waveData = levelManager.waves[currentWaveIndex];
+                enemies = []; 
+                activeEnemies = []; 
+                waveData.enemies.forEach(enemyGroup => { 
+                    for (let i = 0; i < enemyGroup.count; i++) {
+                        const spawnX = cameraX + CANVAS_WIDTH + enemyGroup.spawnXOffset + randomBetween(-30, 30) + (i * (ENEMY_WIDTH + 20));
+                        const spawnY = randomBetween(MIN_Y_POS, MAX_Y_POS); 
+                        let enemy;
+                        if (enemyGroup.type === 'swedish') { enemy = new Enemy(spawnX, spawnY, SWEDISH_HEALTH, 'swedish'); } 
+                        else if (enemyGroup.type === 'referee') { enemy = new Enemy(spawnX, spawnY, REFEREE_HEALTH, 'referee'); } 
+                        else if (enemyGroup.type === 'goalie_boss') { enemy = new Enemy(spawnX, spawnY, GOALIE_HEALTH, 'goalie_boss', ENEMY_SPEED * 0.7); }
+                        if (enemy) {
+                            enemies.push(enemy); 
+                            console.log(`Spawned ${enemy.type} at world X: ${enemy.x}`);
+                        }
+                    }
+                });
+                waveTriggeredFlags[currentWaveIndex] = true; 
+                currentWaveActive = true;
+                allEnemiesOnScreenForCurrentWave = false;
+                screenLock = false; 
+                showContinuePrompt(false); 
+                console.log(`Wave ${currentWaveIndex + 1} spawned. currentWaveActive: ${currentWaveActive}, screenLock: ${screenLock}, enemies count: ${enemies.length}`);
+            }
+
+            function spawnPowerUpsAt(worldX, worldY) {
+                console.log(`Spawning power-ups at world X: ${worldX}, Y: ${worldY}. CameraX: ${cameraX}`);
+                const powerUpDropY = Math.max(MIN_Y_POS, Math.min(worldY, MAX_Y_POS));
+                powerUps.push(new PowerUp(worldX, powerUpDropY, 'damage_boost'));
+                powerUps.push(new PowerUp(worldX + POWERUP_SIZE + 10, powerUpDropY, 'health_boost'));
+                 console.log(`PowerUps array length: ${powerUps.length}, first powerup X: ${powerUps[powerUps.length-2].x}`);
+            }
+            
+            function manageWaveState() {
+                if (currentWaveActive && !allEnemiesOnScreenForCurrentWave) {
+                    let allSpawnedEnemiesNowVisible = true;
+                    if (enemies.length === 0) { 
+                         allSpawnedEnemiesNowVisible = false; 
+                         if (levelManager.waves[currentWaveIndex] && levelManager.waves[currentWaveIndex].enemies.length === 0) {
+                            console.log(`Wave ${currentWaveIndex + 1} has no enemies defined. Auto-clearing.`);
+                            currentWaveActive = false; 
+                         }
+                    } else { 
+                        for (const enemy of enemies) { 
+                            if (enemy.x > cameraX + CANVAS_WIDTH - enemy.width/2) { 
+                                allSpawnedEnemiesNowVisible = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (allSpawnedEnemiesNowVisible && enemies.length > 0) {
+                        console.log(`All enemies for wave ${currentWaveIndex + 1} are now on screen. Locking screen. worldScrollX will be ${cameraX + CANVAS_WIDTH}`);
+                        allEnemiesOnScreenForCurrentWave = true;
+                        screenLock = true;
+                        worldScrollX = cameraX + CANVAS_WIDTH; 
+                    }
+                }
+                
+                if (currentWaveActive) { 
+                     activeEnemies = enemies.filter(e => e.isAlive && e.x < cameraX + CANVAS_WIDTH + e.width*2 && e.x + e.width > cameraX - e.width*2);
+                } else {
+                    activeEnemies = [];
+                }
+            }
+
+            function checkWaveCompletion() { 
+                if (currentWaveActive && allEnemiesOnScreenForCurrentWave && enemies.length === 0) {
+                    
+                    const waveJustCompletedIndex = currentWaveIndex; 
+                    const completedWaveData = levelManager.waves[waveJustCompletedIndex];
+                    console.log(`Wave ${waveJustCompletedIndex + 1} conditions met for completion (enemies list empty).`);
+
+                    screenLock = false;
+                    currentWaveActive = false; 
+                    allEnemiesOnScreenForCurrentWave = false;
+                    activeEnemies = []; 
+                    console.log(`Wave ${waveJustCompletedIndex + 1} CLEARED. Screen unlocked. currentWaveActive set to: ${currentWaveActive}`);
+
+                    if (!completedWaveData.isBossWave) { 
+                        console.log("Playing wave cleared sound.");
+                        playSound(sfxWaveCleared, "Wave Cleared");
+                    }
+
+                    if (completedWaveData.isBossWave) {
+                        console.log("Boss defeated! Victory!");
+                        showVictory();
+                        return; 
+                    }
+
+                    if (waveJustCompletedIndex < levelManager.waves.length - 1) {
+                        console.log("Showing CONTINUE prompt for next wave.");
+                        showContinuePrompt(true);
+                        if (continuePromptTimeout) clearTimeout(continuePromptTimeout);
+                        continuePromptTimeout = setTimeout(() => {
+                            showContinuePrompt(false);
+                        }, 2000);
+                    } else if (!completedWaveData.isBossWave) {
+                        console.log("All non-boss waves cleared. Game effectively ended or ready for more content.");
+                    }
+                }
+            }
+            
+            // Camera Logic
+            function updateCamera() { 
+                if (screenLock) { return; } 
+                
+                const averagePlayerX = (players.length > 0 ? (players[0].x + (players[1] ? players[1].x : players[0].x)) / (players[1] ? 2 : 1) : cameraX + CANVAS_WIDTH / 3);
+                let targetCameraX = averagePlayerX - CANVAS_WIDTH / 3; 
+                targetCameraX = Math.max(cameraX, targetCameraX); 
+                targetCameraX = Math.max(0, targetCameraX);
+                targetCameraX = Math.min(levelManager.worldWidth - CANVAS_WIDTH, targetCameraX);
+                
+                if (targetCameraX > cameraX) { 
+                    cameraX = targetCameraX; 
+                    showContinuePrompt(false); 
+                }
+                if (!currentWaveActive) { 
+                    checkAndSpawnWave();
+                }
+            }
+
+            // Main Game Loop
+            function gameLoop(currentTime) {
+                if (!allImagesLoaded) { 
+                    ctx.fillStyle = 'black'; ctx.fillRect(0,0,CANVAS_WIDTH, CANVAS_HEIGHT);
+                    ctx.fillStyle = 'white'; ctx.textAlign = 'center'; ctx.font = "20px Arial";
+                    ctx.fillText(`Loading Assets... (${imagesLoaded}/${imagesToLoad})`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+                    requestAnimationFrame(gameLoop); return;
+                }
+                if (!gameStarted) {
+                     showMessage("Czech Hockey Rampage!\nP1: WASD+Space | P2: Arrows+Enter\nDefeat the Swedes!", initGame);
+                     gameStarted = 'PENDING_INIT'; 
+                }
+                if (gameStarted !== true && gameStarted !== 'PENDING_INIT') { requestAnimationFrame(gameLoop); return; }
+                if (gameStarted === 'PENDING_INIT' && gameState !== 'PLAYING') { requestAnimationFrame(gameLoop); return; }
+
+                const deltaTime = (currentTime - lastTime) / 1000;
+                lastTime = currentTime;
+
+                if (gameState === 'PLAYING' || gameState === 'WAVE_CLEARED' || gameState === 'BOSS_FIGHT') {
+                    players.forEach(p => p.handleInput(keys, deltaTime));
+                    players.forEach(p => p.update(deltaTime));
+                    
+                    manageWaveState(); 
+
+                    activeEnemies.forEach(e => e.update(deltaTime, players, cameraX)); 
+                    projectiles.forEach(p => p.update(deltaTime, cameraX)); 
+                    powerUps.forEach(p => p.update(deltaTime));
+
+                    players.forEach(player => { if (player.isAlive) { powerUps.forEach(powerUp => { if (powerUp.isAlive && checkCollision(player, powerUp)) { player.applyPowerUp(powerUp.powerUpType); powerUp.isAlive = false; } }); } });
+                    
+                    if(currentWaveActive) { 
+                        enemies = enemies.filter(e => e.isAlive); 
+                    } else { 
+                        enemies = [];
+                    }
+
+                    projectiles = projectiles.filter(p => p.isAlive);
+                    powerUps = powerUps.filter(p => p.isAlive);
+                    
+                    updateCamera(); 
+                    updateHealthUI();
+                    players.forEach(p => { if (p.powerUpActive) { const powerupText = `Damage Up! ${Math.ceil(p.powerUpTimer)}s`; if (p === players[0]) p1PowerupText.textContent = powerupText; else p2PowerupText.textContent = powerupText; } });
+                    
+                    if (players.every(p => !p.isAlive)) { showGameOver(); } 
+                    else { checkWaveCompletion(); } 
+                }
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+
+            // Draw Function
+            function draw() { 
+                ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                if (backgroundImage.complete && backgroundImage.naturalWidth !== 0) {
+                    let imgNatWidth = backgroundImage.naturalWidth; let imgNatHeight = backgroundImage.naturalHeight;
+                    let scaledImgHeight = CANVAS_HEIGHT; let scaledImgWidth = (imgNatWidth / imgNatHeight) * scaledImgHeight;
+                    let tileWidth = scaledImgWidth; let currentDrawX = -(cameraX % tileWidth);
+                    if (cameraX > 0 && currentDrawX > 0) { currentDrawX -= tileWidth; }
+                    let safetyBreak = 0; while(currentDrawX < CANVAS_WIDTH && safetyBreak < 10) { ctx.drawImage(backgroundImage, currentDrawX, 0, tileWidth, scaledImgHeight); currentDrawX += tileWidth; safetyBreak++; }
+                } else { ctx.fillStyle = '#77aaff'; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT); }
+                
+                powerUps.forEach(p => p.draw(ctx, cameraX));
+                projectiles.forEach(p => p.draw(ctx, cameraX));
+                activeEnemies.forEach(e => e.draw(ctx, cameraX)); 
+                players.forEach(p => p.draw(ctx, cameraX));
+            }
+
+            // Event Listeners & Mobile Setup
+            window.addEventListener('keydown', (e) => { keys[e.code] = true; unlockAndInitializeAudio(); }); 
+            window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+            document.body.addEventListener('mousedown', unlockAndInitializeAudio, { once: true });
+            document.body.addEventListener('touchstart', unlockAndInitializeAudio, { once: true, passive: true });
+
+
+            restartButtonGameOver.addEventListener('click', ()=>{initGame(); unlockAndInitializeAudio();});
+            restartButtonVictory.addEventListener('click', ()=>{initGame(); unlockAndInitializeAudio();});
+            function setupMobileButton(button, keyCode) { button.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyCode] = true; unlockAndInitializeAudio(); }, { passive: false }); button.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyCode] = false; }, { passive: false }); button.addEventListener('mousedown', (e) => { e.preventDefault(); keys[keyCode] = true; unlockAndInitializeAudio(); }); button.addEventListener('mouseup', (e) => { e.preventDefault(); keys[keyCode] = false; });}
+             if (isMobile()) { setupMobileButton(p1Up, 'KeyW'); setupMobileButton(p1Down, 'KeyS'); setupMobileButton(p1Left, 'KeyA'); setupMobileButton(p1Right, 'KeyD'); setupMobileButton(p1Action, 'Space'); setupMobileButton(p2Up, 'ArrowUp'); setupMobileButton(p2Down, 'ArrowDown'); setupMobileButton(p2Left, 'ArrowLeft'); setupMobileButton(p2Right, 'ArrowRight'); setupMobileButton(p2Action, 'Enter'); }
+            
+            requestAnimationFrame(gameLoop);
+        })();
+    </script>
+</body>
+</html>

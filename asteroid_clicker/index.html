@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astro-Claster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* bg-gray-900 */
+            color: #F3F4F6; /* text-gray-100 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            overflow-y: auto;
+            padding-top: 1rem;
+        }
+        canvas {
+            background-color: #1F2937; /* bg-gray-800 */
+            border: 1px solid #4B5563; /* border-gray-600 */
+            border-radius: 0.5rem; /* rounded-lg */
+            display: block;
+            cursor: crosshair;
+        }
+        .ui-panel {
+            background-color: #374151; /* bg-gray-700 */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 900px;
+            margin-top: 1rem;
+            position: relative;
+            z-index: 10;
+        }
+        .upgrade-button, .reset-button {
+            background-color: #4F46E5; /* bg-indigo-600 */
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem; /* rounded-md */
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 0.875rem; /* text-sm */
+            margin-top: 0.5rem;
+        }
+        .upgrade-button:hover:not(:disabled), .reset-button:hover:not(:disabled) {
+            background-color: #4338CA; /* bg-indigo-700 */
+        }
+        .upgrade-button:disabled {
+            background-color: #6B7280; /* bg-gray-500 */
+            cursor: not-allowed;
+        }
+        .reset-button {
+            background-color: #D97706; /* bg-amber-600 */
+        }
+        .reset-button:hover:not(:disabled) {
+            background-color: #B45309; /* bg-amber-700 */
+        }
+        .stat-display {
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 600; /* font-semibold */
+        }
+        #gameCanvasContainer {
+            width: 100%;
+            max-width: 900px;
+            aspect-ratio: 16 / 9;
+            position: relative;
+            z-index: 1;
+        }
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameCanvasContainer" class="mb-4">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div class="ui-panel grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="col-span-1 md:col-span-3 text-center mb-2">
+            <span class="stat-display">Scrap: <span id="currencyDisplay">0</span></span>
+            <span class="stat-display ml-4">Score: <span id="scoreDisplay">0</span></span>
+            <span class="stat-display ml-4">Player ID: <span id="userIdDisplay">Loading...</span></span>
+        </div>
+
+        <div id="upgradesColumn1" class="space-y-2"></div>
+        <div id="upgradesColumn2" class="space-y-2"></div>
+        <div id="upgradesColumn3" class="space-y-2"></div>
+
+        <div class="col-span-1 md:col-span-3 text-center mt-4">
+            <button id="resetProgressButton" class="reset-button">Reset Game Progress</button>
+        </div>
+    </div>
+
+    <script type="module">
+        // These global variables are provided by the Canvas environment.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'astro-claster-default-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Firebase imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let app;
+        let auth;
+        let db;
+        let userId;
+        let userDocRef;
+        let gameDataUnsubscribe = null;
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let player;
+        const projectiles = [];
+        const asteroids = [];
+        const particles = [];
+
+        let currency = 0;
+        let score = 0;
+        let mouse = { x: 0, y: 0, down: false };
+        const keysPressed = {};
+        
+        // Fire rate control
+        let lastManualShotTime = 0;
+        const MANUAL_FIRE_COOLDOWN = 150; // Cooldown for manual shots in milliseconds
+        let lastAutoFireTime = 0; // Timer for auto-fire
+
+        // Asteroid spawn control
+        let asteroidSpawnTimer = 0;
+        const BASE_ASTEROID_SPAWN_INTERVAL = 2000; // Initial spawn interval
+        const MIN_ASTEROID_SPAWN_INTERVAL = 400;   // Minimum spawn interval at high scores
+        const SCORE_TO_REACH_MIN_INTERVAL = 200; // Score at which spawn interval is minimal
+        const SMALL_ASTEROID_CHANCE = 0.6; // *** BUG FIX: Re-added this constant ***
+
+        // Asteroid splitting
+        const MIN_ASTEROID_SIZE_NO_SPLIT = 15; // Asteroids with size <= this will not split
+
+        let gameRunning = true;
+        let lastFrameTime = 0;
+        const SCRAP_LOSS_RATE_PER_SECOND = 5;
+        let lastScrapSaveTime = 0;
+        const SCRAP_SAVE_INTERVAL = 2000;
+
+        // Base configuration for upgrades. Used for initialization and reset.
+        const baseUpgradesConfig = {
+            projectileDamage: { name: "Damage", level: 1, cost: 10, baseCost: 5, costMultiplier: 1.5, currentValue: 1, baseValue: 1, increment: 1, maxLevel: 100, description: "Damage: ", unit: "", purchased: false, enabled: false },
+            projectileSpeed: { name: "Proj. Speed", level: 1, cost: 15, baseCost: 10, costMultiplier: 1.6, currentValue: 5, baseValue: 5, increment: 0.5, maxLevel: 50, description: "Speed: ", unit: "px/f", purchased: false, enabled: false },
+            autoFireToggle: { name: "Auto-Fire", purchased: false, cost: 100, baseCost: 100, description: "Enable Auto-Fire", enabled: false, level: 1, currentValue: 0 },
+            autoFireRate: { name: "Fire Rate", level: 1, cost: 50, baseCost: 50, costMultiplier: 1.7, currentValue: 800, baseValue: 800, decrement: 40, minRate: 50, maxLevel: Math.ceil((800 - 50) / 40) +1, description: "Delay: ", unit: "ms", requiresAutoFire: true, purchased: false, enabled: false },
+            multiShot: { name: "Multi-Shot", level: 1, cost: 100, baseCost: 100, costMultiplier: 2.5, currentValue: 1, baseValue: 1, increment: 1, maxLevel: 5, description: "Shots: ", unit: "", purchased: false, enabled: false }
+        };
+        let upgrades = JSON.parse(JSON.stringify(baseUpgradesConfig)); // Working copy of upgrades
+
+        const upgradeKeysCol1 = ['projectileDamage', 'projectileSpeed'];
+        const upgradeKeysCol2 = ['multiShot'];
+        const upgradeKeysCol3 = ['autoFireToggle', 'autoFireRate'];
+
+        const upgradeElements = {}; // To store references to UI elements for upgrades
+
+        async function initFirebase() {
+            if (!firebaseConfig) {
+                console.warn("Firebase config not found. Game will run without Firebase persistence.");
+                userId = `local_${crypto.randomUUID()}`;
+                document.getElementById('userIdDisplay').textContent = userId.substring(0,8);
+                loadLocalGameData();
+                return;
+            }
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                // setLogLevel('debug');
+                await setPersistence(auth, browserLocalPersistence);
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("User is signed in:", userId);
+                        document.getElementById('userIdDisplay').textContent = userId.substring(0,8);
+                        userDocRef = doc(db, "artifacts", appId, "users", userId, "astroClasterUserData", "saveState");
+                        console.log("UserDocRef path set to:", userDocRef.path);
+                        await loadGameDataFromFirestore();
+                    } else {
+                        console.log("User is signed out. Attempting to sign in.");
+                        document.getElementById('userIdDisplay').textContent = "Signing in...";
+                        if (initialAuthToken) {
+                            try { await signInWithCustomToken(auth, initialAuthToken); } catch (error) {
+                                console.error("Error signing in with custom token, falling back to anonymous:", error);
+                                await signInAnonymously(auth);
+                            }
+                        } else { await signInAnonymously(auth); }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization error:", error);
+                userId = `local_error_${crypto.randomUUID()}`;
+                document.getElementById('userIdDisplay').textContent = userId.substring(0,8);
+                loadLocalGameData();
+            }
+        }
+
+        async function loadGameDataFromFirestore() {
+            if (!userDocRef) {
+                console.error("UserDocRef is not defined. Cannot load from Firestore. Initializing new game data in memory.");
+                initializeNewGameDataInMemory();
+                updateUI();
+                return;
+            }
+            if (gameDataUnsubscribe) {
+                console.log("Unsubscribing from previous Firestore listener.");
+                gameDataUnsubscribe();
+                gameDataUnsubscribe = null;
+            }
+            console.log("Attempting to load data from Firestore with ref:", userDocRef.path);
+            gameDataUnsubscribe = onSnapshot(userDocRef, async (docSnap) => {
+                console.log(`Firestore onSnapshot triggered. Doc exists: ${docSnap.exists()}`);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    console.log("Firestore data loaded:", data);
+                    currency = data.currency !== undefined ? data.currency : 0;
+                    score = data.score !== undefined ? data.score : 0;
+                    if (data.upgrades) {
+                        Object.keys(baseUpgradesConfig).forEach(key => { // Iterate over base config keys to ensure all are processed
+                            if (data.upgrades[key]) {
+                                const savedUpgrade = data.upgrades[key];
+                                upgrades[key].level = savedUpgrade.level || baseUpgradesConfig[key].level;
+                                upgrades[key].purchased = savedUpgrade.purchased !== undefined ? savedUpgrade.purchased : baseUpgradesConfig[key].purchased;
+                                if (upgrades[key].hasOwnProperty('enabled')) {
+                                   upgrades[key].enabled = savedUpgrade.enabled !== undefined ? savedUpgrade.enabled : baseUpgradesConfig[key].enabled;
+                                }
+                            } else { // If a specific upgrade is missing in saved data, reset it from base
+                                upgrades[key] = JSON.parse(JSON.stringify(baseUpgradesConfig[key]));
+                            }
+                            recalculateUpgradeStats(key);
+                        });
+                    } else { // No 'upgrades' object in Firestore, reset all from base
+                         upgrades = JSON.parse(JSON.stringify(baseUpgradesConfig));
+                         Object.keys(upgrades).forEach(recalculateUpgradeStats);
+                    }
+                    if (upgrades.autoFireToggle.purchased && upgrades.autoFireToggle.enabled) {
+                        toggleAutoFire(true, true); // silent update
+                    } else {
+                        upgrades.autoFireToggle.enabled = false;
+                    }
+                } else {
+                    console.log("No saved data document found in Firestore. Initializing fresh state.");
+                    initializeNewGameDataInMemory();
+                    if (userDocRef && auth && auth.currentUser) {
+                        console.log("Saving newly initialized state to Firestore for the first time.");
+                        await saveGameDataToFirestore(true);
+                    } else {
+                         console.log("Firebase not ready for initial save of new game data. Saving to local storage if applicable.");
+                         saveLocalGameData();
+                    }
+                }
+                updateUI();
+            }, (error) => {
+                console.error("Error listening to Firestore data:", error, "Path was:", userDocRef.path);
+                loadLocalGameData();
+            });
+        }
+
+        function initializeNewGameDataInMemory() {
+            console.log("Initializing new game data in memory (defaults).");
+            currency = 0; score = 0;
+            upgrades = JSON.parse(JSON.stringify(baseUpgradesConfig)); // Reset to a fresh copy from base config
+            Object.keys(upgrades).forEach(recalculateUpgradeStats); // Recalculate all stats
+            console.log("In-memory game data initialized.");
+        }
+
+        async function saveGameDataToFirestore(forceSave = false) {
+            if (!userDocRef || !auth || !auth.currentUser) {
+                console.log("Firestore save skipped: no userDocRef or user. Falling back to localStorage.");
+                saveLocalGameData();
+                return;
+            }
+            if (!forceSave && Date.now() - lastScrapSaveTime < SCRAP_SAVE_INTERVAL) { return; }
+
+            const dataToSave = { currency, score, upgrades: {} };
+            Object.keys(upgrades).forEach(key => {
+                dataToSave.upgrades[key] = {
+                    level: upgrades[key].level,
+                    purchased: upgrades[key].purchased,
+                };
+                if (upgrades[key].hasOwnProperty('enabled')) {
+                    dataToSave.upgrades[key].enabled = upgrades[key].enabled;
+                }
+            });
+            try {
+                console.log("Attempting to save to Firestore:", dataToSave, "Path:", userDocRef.path);
+                await setDoc(userDocRef, dataToSave);
+                console.log("Game data successfully saved to Firestore.");
+                lastScrapSaveTime = Date.now();
+            } catch (error) {
+                console.error("Error saving data to Firestore:", error, "Path was:", userDocRef.path);
+                saveLocalGameData();
+            }
+        }
+
+        function loadLocalGameData() {
+            console.log("Attempting to load from localStorage.");
+            const localData = localStorage.getItem(`astroClasterData_${appId}`);
+            if (localData) {
+                try {
+                    const data = JSON.parse(localData);
+                    console.log("LocalStorage data loaded:", data);
+                    currency = data.currency !== undefined ? data.currency : 0;
+                    score = data.score !== undefined ? data.score : 0;
+                     if (data.upgrades) {
+                        Object.keys(baseUpgradesConfig).forEach(key => {
+                             if (data.upgrades[key]) {
+                                const savedUpgrade = data.upgrades[key];
+                                upgrades[key].level = savedUpgrade.level || baseUpgradesConfig[key].level;
+                                upgrades[key].purchased = savedUpgrade.purchased !== undefined ? savedUpgrade.purchased : baseUpgradesConfig[key].purchased;
+                                if (upgrades[key].hasOwnProperty('enabled')) {
+                                   upgrades[key].enabled = savedUpgrade.enabled !== undefined ? savedUpgrade.enabled : baseUpgradesConfig[key].enabled;
+                                }
+                            } else {
+                                upgrades[key] = JSON.parse(JSON.stringify(baseUpgradesConfig[key]));
+                            }
+                            recalculateUpgradeStats(key);
+                        });
+                    } else {
+                        initializeNewGameDataInMemory();
+                    }
+                    if (upgrades.autoFireToggle.purchased && upgrades.autoFireToggle.enabled) {
+                        toggleAutoFire(true, true);
+                    } else {
+                        upgrades.autoFireToggle.enabled = false;
+                    }
+                } catch (e) { console.error("Error parsing local data:", e); initializeNewGameDataInMemory(); }
+            } else {
+                console.log("No data in localStorage, initializing new game data for local save.");
+                initializeNewGameDataInMemory();
+                saveLocalGameData();
+            }
+            updateUI();
+        }
+
+        function saveLocalGameData() {
+            const dataToSave = { currency, score, upgrades: {} };
+            Object.keys(upgrades).forEach(key => {
+                dataToSave.upgrades[key] = {
+                    level: upgrades[key].level,
+                    purchased: upgrades[key].purchased,
+                };
+                 if (upgrades[key].hasOwnProperty('enabled')) {
+                    dataToSave.upgrades[key].enabled = upgrades[key].enabled;
+                }
+            });
+            try {
+                localStorage.setItem(`astroClasterData_${appId}`, JSON.stringify(dataToSave));
+                console.log("Game data saved to localStorage.", dataToSave);
+            } catch (e) { console.error("Error saving to localStorage:", e); }
+        }
+
+        class Player {
+            constructor(x, y, size, color) {
+                this.x = x; this.y = y; this.size = size; this.color = color;
+                this.angle = 0; this.vx = 0; this.vy = 0;
+                this.moveSpeed = 2.8;
+                this.friction = 0.88;
+                this.maxSpeed = 5;
+                this.isCollidingWithAsteroid = false;
+            }
+            draw() {
+                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+                ctx.beginPath(); ctx.moveTo(0, -this.size);
+                ctx.lineTo(this.size / 1.5, this.size / 1.5); ctx.lineTo(-this.size / 1.5, this.size / 1.5);
+                ctx.closePath(); ctx.fillStyle = this.isCollidingWithAsteroid ? '#EF4444' : this.color;
+                ctx.fill(); ctx.strokeStyle = '#9CA3AF'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.restore();
+            }
+            update(deltaTime) {
+                const dxMouse = mouse.x - this.x; const dyMouse = mouse.y - this.y;
+                this.angle = Math.atan2(dyMouse, dxMouse) + Math.PI / 2;
+                let thrustX = 0; let thrustY = 0;
+                if (keysPressed['w'] || keysPressed['W']) { thrustY -= this.moveSpeed; }
+                if (keysPressed['s'] || keysPressed['S']) { thrustY += this.moveSpeed; }
+                if (keysPressed['a'] || keysPressed['A']) { thrustX -= this.moveSpeed; }
+                if (keysPressed['d'] || keysPressed['D']) { thrustX += this.moveSpeed; }
+                this.vx += thrustX * 0.15; this.vy += thrustY * 0.15;
+                this.vx *= this.friction; this.vy *= this.friction;
+                const currentSpeed = Math.hypot(this.vx, this.vy);
+                if (currentSpeed > this.maxSpeed) {
+                    this.vx = (this.vx / currentSpeed) * this.maxSpeed;
+                    this.vy = (this.vy / currentSpeed) * this.maxSpeed;
+                }
+                if (Math.abs(this.vx) < 0.05) this.vx = 0;
+                if (Math.abs(this.vy) < 0.05) this.vy = 0;
+                this.x += this.vx; this.y += this.vy;
+                if (this.x < -this.size) this.x = canvas.width + this.size;
+                if (this.x > canvas.width + this.size) this.x = -this.size;
+                if (this.y < -this.size) this.y = canvas.height + this.size;
+                if (this.y > canvas.height + this.size) this.y = -this.size;
+            }
+            shoot() {
+                const numProjectiles = upgrades.multiShot.currentValue;
+                const baseAngle = this.angle - Math.PI / 2;
+                const spreadAngle = numProjectiles > 1 ? Math.PI / (12 + numProjectiles * 2) : 0;
+                for (let i = 0; i < numProjectiles; i++) {
+                    let currentAngle = baseAngle;
+                    if (numProjectiles > 1) currentAngle = baseAngle - (spreadAngle * (numProjectiles - 1) / 2) + (i * spreadAngle);
+                    projectiles.push(new Projectile(
+                        this.x + Math.cos(baseAngle) * (this.size), this.y + Math.sin(baseAngle) * (this.size),
+                        currentAngle, upgrades.projectileSpeed.currentValue, upgrades.projectileDamage.currentValue, '#FBBF24'
+                    ));
+                }
+            }
+        }
+        class Projectile {
+            constructor(x, y, angle, speed, damage, color) {
+                this.x = x; this.y = y; this.angle = angle; this.speed = speed; this.damage = damage;
+                this.color = color; this.size = 4;
+                this.dx = Math.cos(this.angle) * this.speed; this.dy = Math.sin(this.angle) * this.speed;
+            }
+            draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fillStyle = this.color; ctx.fill(); }
+            update() { this.x += this.dx; this.y += this.dy; }
+        }
+        class Asteroid {
+            constructor(x, y, size, speedMultiplier = 1) {
+                this.x = x; this.y = y; this.size = size;
+                this.initialHealth = Math.max(3, Math.floor((size - 5) * 1.5 + score * 0.1));
+                this.currentHealth = this.initialHealth;
+                const angle = Math.random() * Math.PI * 2;
+                const baseSpeed = (Math.random() * 1 + 0.5);
+                const scoreBonusSpeed = score * 0.003;
+                const speed = (baseSpeed + scoreBonusSpeed) * speedMultiplier;
+                this.dx = Math.cos(angle) * speed; this.dy = Math.sin(angle) * speed;
+                this.color = `hsl(0, 0%, ${Math.random() * 30 + 40}%)`;
+                this.value = Math.max(1, Math.floor(size * 0.5 + score * 0.02));
+                this.rotation = 0; this.rotationSpeed = (Math.random() - 0.5) * 0.05;
+                this.sides = Math.floor(Math.random() * 3) + 5; this.angleOffset = (Math.random() * Math.PI) / this.sides;
+            }
+            draw() {
+                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.rotation);
+                ctx.beginPath();
+                for (let i = 0; i < this.sides; i++) {
+                    const angle = (i / this.sides) * Math.PI * 2 + this.angleOffset;
+                    const xPos = this.size * Math.cos(angle); const yPos = this.size * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(xPos, yPos); else ctx.lineTo(xPos, yPos);
+                }
+                ctx.closePath(); ctx.fillStyle = this.color; ctx.fill();
+                ctx.strokeStyle = '#4B5563'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.restore();
+                if (this.currentHealth < this.initialHealth && this.currentHealth > 0) {
+                    const barWidth = this.size * 1.5; const barHeight = 5;
+                    const barX = this.x - barWidth / 2; const barY = this.y - this.size - 10;
+                    ctx.fillStyle = '#DC2626'; ctx.fillRect(barX, barY, barWidth, barHeight);
+                    ctx.fillStyle = '#16A34A'; ctx.fillRect(barX, barY, barWidth * (this.currentHealth / this.initialHealth), barHeight);
+                }
+            }
+            update() {
+                this.x += this.dx; this.y += this.dy; this.rotation += this.rotationSpeed;
+                if (this.x + this.size < 0) this.x = canvas.width + this.size;
+                if (this.x - this.size > canvas.width) this.x = -this.size;
+                if (this.y + this.size < 0) this.y = canvas.height + this.size;
+                if (this.y - this.size > canvas.height) this.y = -this.size;
+            }
+        }
+        class Particle {
+            constructor(x, y, color, size, life) {
+                this.x = x; this.y = y; this.size = Math.random() * size + 1;
+                this.life = life; this.initialLife = life; this.color = color;
+                this.dx = (Math.random() - 0.5) * (Math.random() * 6);
+                this.dy = (Math.random() - 0.5) * (Math.random() * 6);
+            }
+            draw() {
+                ctx.save(); ctx.globalAlpha = this.life / this.initialLife;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color; ctx.fill(); ctx.restore();
+            }
+            update() { this.x += this.dx; this.y += this.dy; this.life--; }
+        }
+        function createExplosion(x, y, baseColor, count = 20, baseSize = 5, baseLife = 30) {
+            for (let i = 0; i < count; i++) {
+                const colorShade = `hsl(${Math.random() * 60 + (baseColor === 'gray' ? 0 : 30)}, ${baseColor === 'gray' ? '0%' : '100%'}, ${Math.random() * 40 + 50}%)`;
+                particles.push(new Particle(x, y, colorShade, baseSize, baseLife));
+            }
+         }
+        function spawnAsteroid() {
+            // *** BUG FIX: Define isSmall using SMALL_ASTEROID_CHANCE ***
+            const isSmall = Math.random() < SMALL_ASTEROID_CHANCE;
+            const size = isSmall ? (Math.random() * 10 + 10) : (Math.random() * 20 + MIN_ASTEROID_SIZE_NO_SPLIT + 1);
+            let x, y;
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? 0 - size : canvas.width + size; y = Math.random() * canvas.height;
+            } else {
+                x = Math.random() * canvas.width; y = Math.random() < 0.5 ? 0 - size : canvas.height + size;
+            }
+            asteroids.push(new Asteroid(x, y, size));
+        }
+        function handleCollisions(deltaTime) {
+            let playerIsCurrentlyColliding = false;
+            if (player) {
+                for (let j = asteroids.length - 1; j >= 0; j--) {
+                    const a = asteroids[j];
+                    if (!a) continue;
+                    const distPlayerAsteroid = Math.hypot(player.x - a.x, player.y - a.y);
+                    if (distPlayerAsteroid < a.size + player.size * 0.8) {
+                        playerIsCurrentlyColliding = true;
+                        const scrapToLose = (SCRAP_LOSS_RATE_PER_SECOND * (deltaTime / 1000));
+                        if (currency > 0) {
+                            currency = Math.max(0, currency - scrapToLose);
+                            if (Date.now() - lastScrapSaveTime > SCRAP_SAVE_INTERVAL) {
+                               saveGameDataToFirestore();
+                            }
+                        }
+                    }
+                }
+                player.isCollidingWithAsteroid = playerIsCurrentlyColliding;
+            }
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                if (!p) continue;
+                for (let j = asteroids.length - 1; j >= 0; j--) {
+                    const a = asteroids[j];
+                    if (!a) continue;
+                    const dist = Math.hypot(p.x - a.x, p.y - a.y);
+                    if (dist < a.size + p.size) {
+                        a.currentHealth -= p.damage;
+                        createExplosion(p.x, p.y, 'yellow', 5, 3, 15);
+                        projectiles.splice(i, 1);
+                        if (a.currentHealth <= 0) {
+                            currency += a.value; score++;
+                            createExplosion(a.x, a.y, 'gray', Math.floor(a.size / 2), a.size / 3, 40);
+
+                            if (a.size > MIN_ASTEROID_SIZE_NO_SPLIT) {
+                                const numSplits = 2;
+                                const newSize = Math.max(5, a.size / 2);
+                                for (let k = 0; k < numSplits; k++) {
+                                    asteroids.push(new Asteroid(
+                                        a.x + (Math.random() - 0.5) * (a.size / 4),
+                                        a.y + (Math.random() - 0.5) * (a.size / 4),
+                                        newSize,
+                                        1.1
+                                    ));
+                                }
+                            }
+                            asteroids.splice(j, 1);
+                            saveGameDataToFirestore(true);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        function update(deltaTime) {
+            if (!gameRunning || !player) return;
+            player.update(deltaTime);
+            projectiles.forEach((p, index) => {
+                p.update();
+                if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) projectiles.splice(index, 1);
+            });
+            asteroids.forEach(a => a.update());
+            particles.forEach((p, index) => { p.update(); if (p.life <= 0) particles.splice(index, 1); });
+            handleCollisions(deltaTime);
+
+            let currentSpawnInterval = BASE_ASTEROID_SPAWN_INTERVAL;
+            if (score > 0 && SCORE_TO_REACH_MIN_INTERVAL > 0) {
+                const progressToMin = Math.min(score / SCORE_TO_REACH_MIN_INTERVAL, 1);
+                currentSpawnInterval = BASE_ASTEROID_SPAWN_INTERVAL - (BASE_ASTEROID_SPAWN_INTERVAL - MIN_ASTEROID_SPAWN_INTERVAL) * progressToMin;
+            }
+            currentSpawnInterval = Math.max(MIN_ASTEROID_SPAWN_INTERVAL, currentSpawnInterval);
+
+            asteroidSpawnTimer += deltaTime;
+            if (asteroidSpawnTimer >= currentSpawnInterval) {
+                if (asteroids.length < (10 + Math.floor(score / 25))) {
+                     spawnAsteroid();
+                }
+                asteroidSpawnTimer -= currentSpawnInterval;
+            }
+
+            if (upgrades.autoFireToggle.purchased && upgrades.autoFireToggle.enabled &&
+                Date.now() - lastAutoFireTime > upgrades.autoFireRate.currentValue) {
+                if(player) player.shoot();
+                lastAutoFireTime = Date.now();
+            }
+        }
+        function draw() {
+            if (!gameRunning || !ctx) return;
+            ctx.fillStyle = '#111827'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if(player) player.draw();
+            projectiles.forEach(p => p.draw()); asteroids.forEach(a => a.draw()); particles.forEach(p => p.draw());
+        }
+
+        function updateUI() {
+            const currencyDisplay = document.getElementById('currencyDisplay');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+
+            if (currencyDisplay) currencyDisplay.textContent = Math.floor(currency);
+            if (scoreDisplay) scoreDisplay.textContent = score;
+
+            const columnElements = {
+                col1: document.getElementById('upgradesColumn1'),
+                col2: document.getElementById('upgradesColumn2'),
+                col3: document.getElementById('upgradesColumn3')
+            };
+            const columnKeys = {
+                col1: upgradeKeysCol1,
+                col2: upgradeKeysCol2,
+                col3: upgradeKeysCol3
+            };
+
+            Object.keys(columnKeys).forEach(colName => {
+                const currentColumnElement = columnElements[colName];
+                if (!currentColumnElement) return;
+
+                columnKeys[colName].forEach(key => {
+                    const upgrade = upgrades[key];
+                    if (!upgrade) {
+                        console.error(`Upgrade with key "${key}" not found during UI update.`);
+                        return;
+                    }
+
+                    let div = upgradeElements[key] ? upgradeElements[key].div : null;
+                    let valueP = upgradeElements[key] ? upgradeElements[key].valueP : null;
+                    let button = upgradeElements[key] ? upgradeElements[key].button : null;
+
+                    if (!div) {
+                        div = document.createElement('div');
+                        div.className = 'p-2 bg-gray-800 rounded';
+                        div.id = `upgrade-div-${key}`;
+
+                        valueP = document.createElement('p');
+                        valueP.className = 'text-sm text-gray-300';
+                        div.appendChild(valueP);
+
+                        button = document.createElement('button');
+                        button.className = 'upgrade-button w-full';
+                        button.dataset.upgradeKey = key;
+                        button.addEventListener('click', (event) => {
+                            const clickedKey = event.currentTarget.dataset.upgradeKey;
+                            buyUpgrade(clickedKey);
+                        });
+                        div.appendChild(button);
+                        currentColumnElement.appendChild(div);
+                        upgradeElements[key] = { div, valueP, button };
+                    }
+
+                    let valueTextContent = '';
+                    if (key === 'autoFireToggle') {
+                        valueTextContent = upgrade.description;
+                    } else if (upgrade.hasOwnProperty('currentValue')) {
+                        valueTextContent = `${upgrade.description}${upgrade.currentValue.toFixed(upgrade.unit === 'ms' ? 0 : (upgrade.unit === 'px/f' ? 1 : 0))}${upgrade.unit}`;
+                        if (upgrade.level) valueTextContent += ` (Lvl ${upgrade.level})`;
+                    }
+                    valueP.textContent = valueTextContent;
+
+                    let buttonTextContent = `${upgrade.name}`;
+                    if (key === 'autoFireToggle') {
+                        if (upgrade.purchased) {
+                            buttonTextContent = upgrade.enabled ? `Disable ${upgrade.name}` : `Enable ${upgrade.name}`;
+                        } else {
+                            buttonTextContent += ` - ${upgrade.cost}S`;
+                        }
+                    } else {
+                        let isEffectivelyMaxLevel = (upgrade.maxLevel && upgrade.level >= upgrade.maxLevel) || (key === 'autoFireRate' && upgrade.currentValue <= (upgrade.minRate || 0));
+                        if (!isEffectivelyMaxLevel) {
+                            buttonTextContent += ` - ${upgrade.cost}S`;
+                        } else {
+                             buttonTextContent = `${upgrade.name} - MAX`;
+                        }
+                    }
+                    button.textContent = buttonTextContent;
+
+                    let canAfford = currency >= (upgrade.cost || 0);
+                    let isMaxLevel = (upgrade.maxLevel && upgrade.level >= upgrade.maxLevel) || (key === 'autoFireRate' && upgrade.minRate && upgrade.currentValue <= upgrade.minRate);
+
+                    button.disabled = false;
+                    button.style.backgroundColor = '';
+
+                    if (key === 'autoFireToggle') {
+                        if (!upgrade.purchased && !canAfford) button.disabled = true;
+                        if (upgrade.purchased) {
+                            button.style.backgroundColor = upgrade.enabled ? '#EF4444' : '#22C55E';
+                        }
+                    } else {
+                        if (!canAfford || isMaxLevel) button.disabled = true;
+                    }
+
+                    if (upgrade.requiresAutoFire && (!upgrades.autoFireToggle.purchased || !upgrades.autoFireToggle.enabled)) {
+                        button.disabled = true;
+                        if (!valueP.textContent.includes("(Req. Auto-Fire On)")) {
+                           valueP.textContent += " (Req. Auto-Fire On)";
+                        }
+                    } else {
+                        if (valueP.textContent.includes("(Req. Auto-Fire On)")) {
+                           valueP.textContent = valueP.textContent.replace(" (Req. Auto-Fire On)", "");
+                        }
+                    }
+                });
+            });
+        }
+
+        function recalculateUpgradeStats(key) {
+            const upgrade = upgrades[key];
+            if (!upgrade) { return; }
+            
+            const baseValue = baseUpgradesConfig[key] ? baseUpgradesConfig[key].baseValue : 0;
+            const increment = baseUpgradesConfig[key] ? baseUpgradesConfig[key].increment : 0;
+            const decrement = baseUpgradesConfig[key] ? baseUpgradesConfig[key].decrement : 0;
+            const minRate = baseUpgradesConfig[key] ? baseUpgradesConfig[key].minRate : 0;
+
+            if (upgrade.hasOwnProperty('baseValue')) {
+                if (upgrade.hasOwnProperty('increment')) {
+                    upgrade.currentValue = upgrade.baseValue + (upgrade.increment * (upgrade.level - 1));
+                } else if (upgrade.hasOwnProperty('decrement')) {
+                    upgrade.currentValue = Math.max(upgrade.minRate || 0, upgrade.baseValue - (upgrade.decrement * (upgrade.level - 1)));
+                }
+            } else if (key === 'autoFireToggle') {
+                upgrade.currentValue = upgrade.purchased ? 1 : 0;
+            }
+
+            const baseCost = baseUpgradesConfig[key] ? baseUpgradesConfig[key].baseCost : Infinity;
+            const costMultiplier = baseUpgradesConfig[key] ? baseUpgradesConfig[key].costMultiplier : 1;
+            const maxLevel = baseUpgradesConfig[key] ? baseUpgradesConfig[key].maxLevel : Infinity;
+
+            if (key === 'autoFireToggle') {
+                upgrade.cost = upgrade.purchased ? 0 : baseCost;
+            } else if (upgrade.hasOwnProperty('baseCost') && upgrade.hasOwnProperty('costMultiplier')) {
+                 let isEffectivelyMaxLevel = (upgrade.maxLevel && upgrade.level >= upgrade.maxLevel) ||
+                                          (key === 'autoFireRate' && upgrade.currentValue <= (upgrade.minRate || 0));
+                if (isEffectivelyMaxLevel) {
+                    upgrade.cost = Infinity;
+                } else {
+                    const currentBaseCost = upgrade.baseCost !== undefined ? upgrade.baseCost : baseCost;
+                    const currentCostMultiplier = upgrade.costMultiplier !== undefined ? upgrade.costMultiplier : costMultiplier;
+                    upgrade.cost = Math.floor(currentBaseCost * Math.pow(currentCostMultiplier, upgrade.level -1));
+                     if (upgrade.level === 1) upgrade.cost = currentBaseCost;
+                }
+            }
+        }
+
+        function buyUpgrade(key) {
+            const upgrade = upgrades[key];
+            if (!upgrade) { console.error(`Upgrade ${key} not found.`); return; }
+
+            let canAfford = currency >= (upgrade.cost || 0);
+            let isStandardMaxLevel = (upgrade.maxLevel && upgrade.level >= upgrade.maxLevel);
+            let isFireRateMaxed = (key === 'autoFireRate' && upgrade.minRate && upgrade.currentValue <= upgrade.minRate);
+            let isMaxLevel = isStandardMaxLevel || isFireRateMaxed;
+
+            if (key === 'autoFireToggle') {
+                if (!upgrade.purchased && canAfford) {
+                    currency -= upgrade.cost;
+                    upgrade.purchased = true;
+                    toggleAutoFire(true);
+                } else if (upgrade.purchased) {
+                    toggleAutoFire(!upgrade.enabled);
+                }
+            } else {
+                 if (upgrade.requiresAutoFire && (!upgrades.autoFireToggle.purchased || !upgrades.autoFireToggle.enabled)) {
+                    return;
+                }
+                if (canAfford && !isMaxLevel) {
+                    currency -= upgrade.cost;
+                    upgrade.level++;
+                    recalculateUpgradeStats(key);
+                }
+            }
+            updateUI();
+            saveGameDataToFirestore(true);
+        }
+
+        function toggleAutoFire(forceState, silent = false) {
+            const autoFireUpgrade = upgrades.autoFireToggle;
+            if (!autoFireUpgrade.purchased && forceState === true && !silent) { return; }
+
+            if (forceState !== undefined) autoFireUpgrade.enabled = forceState;
+            else autoFireUpgrade.enabled = !autoFireUpgrade.enabled;
+
+            recalculateUpgradeStats('autoFireToggle');
+            if (autoFireUpgrade.enabled) lastAutoFireTime = Date.now();
+        }
+
+        async function resetFullGameProgress() {
+            console.log("resetFullGameProgress() function entered.");
+            console.log("Proceeding with reset...");
+
+            initializeNewGameDataInMemory();
+            console.log("In-memory game variables reset to default.");
+
+            if (userDocRef && auth && auth.currentUser) {
+                console.log("Attempting to save reset state to Firestore...");
+                await saveGameDataToFirestore(true);
+                console.log("Firestore save attempt complete after reset.");
+            } else {
+                console.log("Firebase not ready, cannot save reset state to Firestore. Will rely on localStorage clear.");
+            }
+
+            try {
+                localStorage.removeItem(`astroClasterData_${appId}`);
+                console.log("LocalStorage progress cleared.");
+            } catch (e) {
+                console.error("Error clearing localStorage:", e);
+            }
+
+            updateUI();
+            console.log("Game progress reset process complete. UI updated.");
+            console.log("Game progress has been reset!");
+        }
+
+
+        function setupEventListeners() {
+            canvas.addEventListener('mousemove', (e) => {
+                const currentRect = canvas.getBoundingClientRect();
+                mouse.x = e.clientX - currentRect.left; mouse.y = e.clientY - currentRect.top;
+            });
+            canvas.addEventListener('mousedown', (e) => {
+                if (e.button === 0) {
+                    mouse.down = true;
+                    if (player) {
+                        const currentTime = Date.now();
+                        if (currentTime - lastManualShotTime > MANUAL_FIRE_COOLDOWN) {
+                            player.shoot();
+                            lastManualShotTime = currentTime;
+                        }
+                    }
+                }
+            });
+            canvas.addEventListener('mouseup', (e) => { if (e.button === 0) mouse.down = false; });
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+            window.addEventListener('keydown', (e) => { keysPressed[e.key.toLowerCase()] = true; });
+            window.addEventListener('keyup', (e) => { keysPressed[e.key.toLowerCase()] = false; });
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault(); const touch = e.touches[0]; const currentRect = canvas.getBoundingClientRect();
+                mouse.x = touch.clientX - currentRect.left; mouse.y = touch.clientY - currentRect.top;
+                mouse.down = true;
+                if (player) {
+                    const currentTime = Date.now();
+                    if (currentTime - lastManualShotTime > MANUAL_FIRE_COOLDOWN) {
+                        player.shoot();
+                        lastManualShotTime = currentTime;
+                    }
+                }
+            }, { passive: false });
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault(); const touch = e.touches[0]; const currentRect = canvas.getBoundingClientRect();
+                mouse.x = touch.clientX - currentRect.left; mouse.y = touch.clientY - currentRect.top;
+            }, { passive: false });
+            canvas.addEventListener('touchend', (e) => { e.preventDefault(); mouse.down = false; }, { passive: false });
+            window.addEventListener('resize', resizeCanvas);
+
+            const resetButton = document.getElementById('resetProgressButton');
+            if (resetButton) {
+                if (!resetButton.hasAttribute('data-listener-attached')) {
+                    console.log("Attaching ONE-TIME click listener to resetProgressButton.");
+                    resetButton.addEventListener('click', resetFullGameProgress);
+                    resetButton.setAttribute('data-listener-attached', 'true');
+                }
+            }
+        }
+        function resizeCanvas() {
+            const container = document.getElementById('gameCanvasContainer');
+            if (!container) return;
+            const aspectRatio = 16 / 9;
+            let newWidth = container.clientWidth; let newHeight = newWidth / aspectRatio;
+            if (newHeight > container.clientHeight && container.clientHeight > 0) {
+                 newHeight = container.clientHeight; newWidth = newHeight * aspectRatio;
+            }
+            if (container.clientHeight === 0 && window.innerHeight > 0) {
+                let availableHeight = window.innerHeight * 0.60;
+                if (newHeight > availableHeight) {
+                    newHeight = availableHeight;
+                    newWidth = newHeight * aspectRatio;
+                }
+                if (newWidth > container.clientWidth) {
+                    newWidth = container.clientWidth;
+                    newHeight = newWidth / aspectRatio;
+                }
+            }
+            canvas.width = Math.max(320, newWidth);
+            canvas.height = Math.max(180, newHeight);
+            if(gameRunning && ctx) draw();
+        }
+
+        async function init() {
+            console.log("Initializing game...");
+            resizeCanvas();
+            upgrades = JSON.parse(JSON.stringify(baseUpgradesConfig));
+            Object.keys(upgrades).forEach(recalculateUpgradeStats);
+            updateUI();
+
+            await initFirebase();
+
+            player = new Player(canvas.width / 2, canvas.height / 1.5, 15, '#6EE7B7');
+            setupEventListeners();
+
+            if (asteroids.length === 0 && gameRunning) {
+                console.log("Spawning initial asteroids.");
+                for(let i=0; i<3; i++) spawnAsteroid();
+            }
+
+            lastFrameTime = performance.now();
+            if (gameRunning) {
+                requestAnimationFrame(gameLoop);
+                console.log("Game initialized and loop started.");
+            }
+        }
+
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+            const deltaTime = timestamp - lastFrameTime; lastFrameTime = timestamp;
+            if (deltaTime > 0 && deltaTime < 100) update(Math.min(deltaTime, 50));
+            draw();
+            updateUI();
+            requestAnimationFrame(gameLoop);
+        }
+
+        if (document.readyState === 'loading') {
+            window.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

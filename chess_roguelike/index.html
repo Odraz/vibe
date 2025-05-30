@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Roguelike Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: #1a202c; color: #e2e8f0; margin: 0; padding: 20px; box-sizing: border-box; }
+        #gameContainer { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; max-width: 1200px; }
+        canvas { border: 2px solid #4a5568; background-color: #2d3748; cursor: pointer; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+        .ui-panel { background-color: #2d3748; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; display: flex; flex-direction: column; gap: 10px; }
+        .ui-panel h2 { margin-top: 0; margin-bottom: 10px; font-size: 1.25em; color: #a0aec0; border-bottom: 1px solid #4a5568; padding-bottom: 5px; }
+        .ui-stat { display: flex; justify-content: space-between; font-size: 1em; }
+        .ui-stat span:first-child { font-weight: bold; color: #718096; }
+        #messageLog { height: 80px; overflow-y: auto; background-color: #1a202c; border: 1px solid #4a5568; border-radius: 4px; padding: 10px; font-size: 0.9em; line-height: 1.4; }
+        .message { margin-bottom: 5px; }
+        .message.player { color: #63b3ed; }
+        .message.enemy { color: #f56565; }
+        .message.system { color: #9f7aea; }
+        .transform-buttons button { background-color: #4a5568; color: #e2e8f0; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; margin-right: 5px; margin-bottom: 5px; }
+        .transform-buttons button:hover:not(:disabled) { background-color: #718096; }
+        .transform-buttons button:disabled { background-color: #2d3748; color: #718096; cursor: not-allowed; }
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); justify-content: center; align-items: center; }
+        .modal-content { background-color: #2d3748; margin: auto; padding: 20px; border: 1px solid #4a5568; border-radius: 8px; width: 80%; max-width: 400px; text-align: center; box-shadow: 0 8px 16px rgba(0,0,0,0.2); }
+        .modal-content h2 { margin-top: 0; color: #a0aec0; }
+        .modal-content button { background-color: #63b3ed; color: #1a202c; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 1em; margin-top: 15px; }
+        .modal-content button:hover { background-color: #4299e1; }
+
+        /* Responsive adjustments */
+        @media (min-width: 768px) {
+            #gameContainer { flex-direction: row; align-items: flex-start; }
+            #gameCanvas { /* min-width needed to prevent squishing if UI panel is too wide */ }
+            .ui-panel-container { display: flex; flex-direction: column; gap: 20px; min-width: 280px; max-width: 350px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div class="ui-panel-container">
+            <div class="ui-panel">
+                <h2>Game Status</h2>
+                <div class="ui-stat"><span>ELO:</span> <span id="eloDisplay">0</span></div>
+                <div class="ui-stat"><span>Current Piece:</span> <span id="currentPieceDisplay">Pawn (♟️)</span></div>
+                <div class="ui-stat"><span>Actions Left:</span> <span id="actionsLeftDisplay">5</span></div>
+                <div class="ui-stat"><span>Turns:</span> <span id="turnsDisplay">0</span></div>
+                <div class="ui-stat"><span>Level:</span> <span id="levelDisplay">1</span></div>
+            </div>
+            <div class="ui-panel">
+                <h2>Transformations</h2>
+                <div id="transformButtons" class="transform-buttons">
+                    </div>
+            </div>
+            <div class="ui-panel">
+                <h2>Message Log</h2>
+                <div id="messageLog">
+                    <div class="message system">Welcome to Chess Roguelike!</div>
+                </div>
+            </div>
+             <div class="ui-panel">
+                <h2>Controls</h2>
+                <p class="text-sm text-gray-400">Click on a highlighted square to move or attack.</p>
+                <p class="text-sm text-gray-400">Yellow dots (🟡) are doors to other rooms.</p>
+                <p class="text-sm text-gray-400">Move next to a door, then click the door to enter.</p>
+                <p class="text-sm text-gray-400">You have 5 actions per turn.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+            <h2 id="gameOverTitle">Game Over</h2>
+            <p id="gameOverMessage">You were captured!</p>
+            <button id="restartGameButton">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Game Configuration ---
+        const TILE_SIZE = 30; 
+        const NUM_ROOM_ROWS = 3; 
+        const NUM_ROOM_COLS = 3; 
+        
+        // ROOM_FOOTPRINT defines the total size of a room cell, including its 1-tile thick wall.
+        // The internal floor space will be (ROOM_FOOTPRINT_WIDTH-2) x (ROOM_FOOTPRINT_HEIGHT-2).
+        const ROOM_FOOTPRINT_WIDTH = 10; 
+        const ROOM_FOOTPRINT_HEIGHT = 10;
+
+        // Calculate total board dimensions based on shared walls
+        // If walls are shared, each room effectively contributes (FOOTPRINT_WIDTH-1) to the total, plus 1 for the final outer wall.
+        const TOTAL_TILES_WIDE = NUM_ROOM_COLS * (ROOM_FOOTPRINT_WIDTH - 1) + 1;
+        const TOTAL_TILES_HIGH = NUM_ROOM_ROWS * (ROOM_FOOTPRINT_HEIGHT - 1) + 1;
+
+
+        const FOG_COLOR = "rgba(45, 55, 72, 0.8)"; 
+        const WALL_COLOR = "#4a5568";
+        const DOOR_COLOR = "#f6e05e"; 
+        const FLOOR_LIGHT_COLOR = "#f7fafc"; 
+        const FLOOR_DARK_COLOR = "#e2e8f0";  
+        const HIGHLIGHT_VALID_MOVE_COLOR = "rgba(74, 222, 128, 0.5)"; 
+        const HIGHLIGHT_ATTACK_MOVE_COLOR = "rgba(245, 101, 101, 0.5)";
+        const LEVEL_EXIT_COLOR = "rgba(159, 122, 234, 0.7)";
+        const PIECE_DRAW_COLOR = "#1A202C"; 
+        const DEBUG_LOGGING = true; 
+
+        const PIECE_TYPES = {
+            PAWN: 'pawn', KNIGHT: 'knight', BISHOP: 'bishop', ROOK: 'rook', QUEEN: 'queen', KING: 'king'
+        };
+
+        const PLAYER_PIECES = { 
+            [PIECE_TYPES.PAWN]: { emoji: '♟️', eloToUnlock: 0, transformCost: 1 }, 
+            [PIECE_TYPES.KNIGHT]: { emoji: '♞', eloToUnlock: 20, transformCost: 1 },
+            [PIECE_TYPES.BISHOP]: { emoji: '♝', eloToUnlock: 40, transformCost: 1 },
+            [PIECE_TYPES.ROOK]: { emoji: '♜', eloToUnlock: 60, transformCost: 1 },
+            [PIECE_TYPES.QUEEN]: { emoji: '♛', eloToUnlock: 100, transformCost: 2 },
+        };
+
+        const ENEMY_PIECES = {
+            [PIECE_TYPES.PAWN]: { emoji: '♙', eloValue: 5 },
+            [PIECE_TYPES.KNIGHT]: { emoji: '♘', eloValue: 15 },
+            [PIECE_TYPES.BISHOP]: { emoji: '♗', eloValue: 15 },
+            [PIECE_TYPES.ROOK]: { emoji: '♖', eloValue: 25 },
+            [PIECE_TYPES.QUEEN]: { emoji: '♕', eloValue: 40 },
+        };
+        
+        const MAX_PLAYER_ACTIONS_PER_TURN = 5;
+
+        // --- Game State Variables ---
+        let canvas, ctx;
+        let board = []; 
+        let rooms = []; 
+        let player = {}; 
+        let enemies = [];
+        let currentLevel = 1;
+        let gameTurns = 0; 
+        let playerActionsRemaining = MAX_PLAYER_ACTIONS_PER_TURN;
+        let gameState = 'loading'; 
+        let validMoves = []; 
+        let messageLogElement, eloDisplay, currentPieceDisplay, turnsDisplay, levelDisplay, transformButtonsContainer, actionsLeftDisplay;
+        let gameOverModal, gameOverTitle, gameOverMessage, restartGameButton;
+
+
+        // --- Initialization ---
+        window.onload = () => {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            
+            canvas.width = TOTAL_TILES_WIDE * TILE_SIZE;
+            canvas.height = TOTAL_TILES_HIGH * TILE_SIZE;
+
+            messageLogElement = document.getElementById('messageLog');
+            eloDisplay = document.getElementById('eloDisplay');
+            currentPieceDisplay = document.getElementById('currentPieceDisplay');
+            actionsLeftDisplay = document.getElementById('actionsLeftDisplay');
+            turnsDisplay = document.getElementById('turnsDisplay');
+            levelDisplay = document.getElementById('levelDisplay');
+            transformButtonsContainer = document.getElementById('transformButtons');
+            
+            gameOverModal = document.getElementById('gameOverModal');
+            gameOverTitle = document.getElementById('gameOverTitle');
+            gameOverMessage = document.getElementById('gameOverMessage');
+            restartGameButton = document.getElementById('restartGameButton');
+
+            restartGameButton.addEventListener('click', () => {
+                gameOverModal.style.display = 'none';
+                if (gameState === 'levelComplete') {
+                    currentLevel++; 
+                    playerActionsRemaining = MAX_PLAYER_ACTIONS_PER_TURN; 
+                    generateLevel(); 
+                    updateUI(); 
+                    addMessage(`Starting Level ${currentLevel}. You have ${playerActionsRemaining} actions. (Turn ${gameTurns})`, "system");
+                    gameState = 'playerTurn'; 
+                    calculatePlayerValidMoves(); 
+                    drawGame(); 
+                } else { 
+                    startGame(); 
+                }
+            });
+            
+            canvas.addEventListener('click', handleCanvasClick);
+            startGame(); 
+        };
+
+        function startGame() {
+            currentLevel = 1;
+            gameTurns = 0;
+            playerActionsRemaining = MAX_PLAYER_ACTIONS_PER_TURN;
+            player = {
+                row: -1, col: -1, 
+                type: PIECE_TYPES.PAWN,
+                elo: 0,
+                unlockedPieces: [PIECE_TYPES.PAWN], 
+                currentRoomId: -1,
+                isPlayer: true,
+                color: 'white',
+            };
+            enemies = [];
+            generateLevel(); 
+            updateUI();
+            addMessage(`Game started. Level ${currentLevel}. Find the exit!`, "system");
+            gameState = 'playerTurn';
+            calculatePlayerValidMoves(); 
+            drawGame();
+        }
+
+        // --- Map Generation ---
+        function generateLevel() {
+            if (DEBUG_LOGGING) console.log(`--- Generating Level --- (Board Size: ${TOTAL_TILES_WIDE}x${TOTAL_TILES_HIGH})`);
+            board = [];
+            rooms = [];
+            // Initialize board with a default "unassigned" or "solid_rock" state
+            for (let r = 0; r < TOTAL_TILES_HIGH; r++) {
+                board[r] = [];
+                for (let c = 0; c < TOTAL_TILES_WIDE; c++) {
+                    // Initialize as wall; floors will be carved out. This simplifies boundary walls.
+                    board[r][c] = { type: 'wall', visible: false, roomId: -1, piece: null };
+                }
+            }
+
+            let roomCounter = 0;
+            for (let roomGridR = 0; roomGridR < NUM_ROOM_ROWS; roomGridR++) { 
+                for (let roomGridC = 0; roomGridC < NUM_ROOM_COLS; roomGridC++) { 
+                    const roomId = roomCounter++;
+                    // Calculate origin of this room cell (top-left corner of its footprint)
+                    const roomOriginR = roomGridR * (ROOM_FOOTPRINT_HEIGHT - 1);
+                    const roomOriginC = roomGridC * (ROOM_FOOTPRINT_WIDTH - 1);
+                    
+                    const currentRoomTiles = [];
+
+                    // Carve out floor within the room's footprint
+                    // Floor is from local (1,1) to (FOOTPRINT_HEIGHT-2, FOOTPRINT_WIDTH-2)
+                    for (let localR = 1; localR < ROOM_FOOTPRINT_HEIGHT - 1; localR++) {
+                        for (let localC = 1; localC < ROOM_FOOTPRINT_WIDTH - 1; localC++) {
+                            const absR = roomOriginR + localR;
+                            const absC = roomOriginC + localC;
+                            if (absR < TOTAL_TILES_HIGH && absC < TOTAL_TILES_WIDE) { // Boundary check
+                                board[absR][absC] = { type: 'floor', visible: false, roomId: roomId, piece: null };
+                                currentRoomTiles.push({ r: absR, c: absC });
+                            }
+                        }
+                    }
+                    // Walls are implicitly formed by the initial fill and floor carving.
+                    // Shared walls will correctly be single-tile thick.
+                    rooms.push({ 
+                        id: roomId, 
+                        r: roomGridR, // Grid position
+                        c: roomGridC, // Grid position
+                        originR: roomOriginR, // Absolute board position
+                        originC: roomOriginC, // Absolute board position
+                        tiles: currentRoomTiles, // Floor tiles
+                        connected: false 
+                    });
+                     if (DEBUG_LOGGING) console.log(`Created Room ${roomId} at grid (${roomGridR}, ${roomGridC}), origin (${roomOriginR},${roomOriginC}) with ${currentRoomTiles.length} floor tiles.`);
+                }
+            }
+            
+            connectRooms(); 
+
+            const startRoom = rooms.find(room => room.id === 0); 
+            if (startRoom && startRoom.tiles.length > 0) {
+                const playerStartPos = startRoom.tiles[Math.floor(startRoom.tiles.length / 2)]; 
+                player.row = playerStartPos.r;
+                player.col = playerStartPos.c;
+                player.currentRoomId = startRoom.id;
+                board[player.row][player.col].piece = player; 
+                if (DEBUG_LOGGING) console.log(`Player placed in Room ${startRoom.id} at (${player.row}, ${player.col})`);
+                revealRoom(startRoom.id); 
+            } else {
+                // Fallback
+            }
+
+            const endRoom = rooms.find(room => room.id === rooms.length - 1);
+            if (endRoom && endRoom.tiles.length > 0) {
+                let exitPos;
+                let attempts = 0;
+                do { 
+                    exitPos = endRoom.tiles[Math.floor(Math.random() * endRoom.tiles.length)];
+                    attempts++;
+                } while (exitPos.r === player.row && exitPos.c === player.col && attempts < 50); 
+
+                if (attempts < 50 && board[exitPos.r] && board[exitPos.r][exitPos.c]) {
+                     board[exitPos.r][exitPos.c].type = 'exit';
+                     if (DEBUG_LOGGING) console.log(`Exit placed in Room ${endRoom.id} at (${exitPos.r}, ${exitPos.c})`);
+                } else if (endRoom.tiles.length > 0) { 
+                    // Fallback
+                }
+            } else {
+                 // Error
+            }
+            populateEnemies(startRoom ? startRoom.id : -1); 
+            if (DEBUG_LOGGING) console.log("--- Level Generation Complete ---");
+        }
+
+        function connectRooms() {
+            if (DEBUG_LOGGING) console.log("Connecting rooms with single-tile doors...");
+            if (rooms.length === 0) return;
+            let connectedRoomsSet = new Set(); 
+            const firstRoom = rooms.find(r => r.id === 0);
+            if (!firstRoom) { /* error handling */ return; }
+            connectedRoomsSet.add(firstRoom.id);
+            firstRoom.connected = true;
+            
+            let edges = [];
+
+            function addEdgesForRoomConnect(roomId) { 
+                const currentRoom = rooms.find(r => r.id === roomId);
+                if (!currentRoom) return;
+                const neighborDeltas = [{ dr: -1, dc: 0, wallSide: 'top' }, { dr: 1, dc: 0, wallSide: 'bottom' }, { dr: 0, dc: -1, wallSide: 'left' }, { dr: 0, dc: 1, wallSide: 'right' }];
+
+                for (const delta of neighborDeltas) {
+                    const neighborRoomGridR = currentRoom.r + delta.dr;
+                    const neighborRoomGridC = currentRoom.c + delta.dc;
+
+                    if (neighborRoomGridR >= 0 && neighborRoomGridR < NUM_ROOM_ROWS && 
+                        neighborRoomGridC >= 0 && neighborRoomGridC < NUM_ROOM_COLS) {
+                        const neighborRoom = rooms.find(r_n => r_n.r === neighborRoomGridR && r_n.c === neighborRoomGridC);
+                        if (neighborRoom && !neighborRoom.connected) {
+                            edges.push({ from: roomId, to: neighborRoom.id, details: delta });
+                        }
+                    }
+                }
+            }
+            
+            addEdgesForRoomConnect(firstRoom.id);
+
+            while (edges.length > 0 && connectedRoomsSet.size < rooms.length) {
+                const edgeIndex = Math.floor(Math.random() * edges.length);
+                const edge = edges.splice(edgeIndex, 1)[0];
+                const fromRoom = rooms.find(r => r.id === edge.from);
+                const toRoom = rooms.find(r => r.id === edge.to);
+
+
+                if (toRoom && !toRoom.connected && fromRoom) {
+                    toRoom.connected = true;
+                    connectedRoomsSet.add(toRoom.id);
+                    if (DEBUG_LOGGING) console.log(`Connecting Room ${fromRoom.id} to Room ${toRoom.id} via ${edge.details.wallSide} wall of fromRoom.`);
+                    
+                    let doorR, doorC;
+
+                    if (edge.details.wallSide === 'right') { // Connecting to room on the right
+                        doorC = fromRoom.originC + ROOM_FOOTPRINT_WIDTH - 1; // Shared wall column
+                        doorR = fromRoom.originR + 1 + Math.floor(Math.random() * (ROOM_FOOTPRINT_HEIGHT - 2)); // Random row along the wall, avoiding corners
+                    } else if (edge.details.wallSide === 'left') { // Connecting to room on the left
+                        doorC = fromRoom.originC; // Shared wall column
+                        doorR = fromRoom.originR + 1 + Math.floor(Math.random() * (ROOM_FOOTPRINT_HEIGHT - 2));
+                    } else if (edge.details.wallSide === 'bottom') { // Connecting to room below
+                        doorR = fromRoom.originR + ROOM_FOOTPRINT_HEIGHT - 1; // Shared wall row
+                        doorC = fromRoom.originC + 1 + Math.floor(Math.random() * (ROOM_FOOTPRINT_WIDTH - 2));
+                    } else { // wallSide === 'top' // Connecting to room above
+                        doorR = fromRoom.originR; // Shared wall row
+                        doorC = fromRoom.originC + 1 + Math.floor(Math.random() * (ROOM_FOOTPRINT_WIDTH - 2));
+                    }
+                    
+                    if (doorR >= 0 && doorR < TOTAL_TILES_HIGH && doorC >= 0 && doorC < TOTAL_TILES_WIDE &&
+                        board[doorR][doorC] && board[doorR][doorC].type === 'wall') {
+                        board[doorR][doorC].type = 'door';
+                        board[doorR][doorC].connects = [fromRoom.id, toRoom.id]; // Store which rooms it connects
+                        if (DEBUG_LOGGING) console.log(`  Single door created at (${doorR},${doorC})`);
+                    } else {
+                        if (DEBUG_LOGGING) console.warn(`  Failed to create door at (${doorR},${doorC}). Tile was not a wall or out of bounds.`);
+                    }
+                    addEdgesForRoomConnect(toRoom.id);
+                }
+                edges = edges.filter(e => {
+                    const targetRoom = rooms.find(r => r.id === e.to);
+                    return targetRoom ? !targetRoom.connected : true;
+                });
+            }
+            if (DEBUG_LOGGING) console.log("Room connection process finished.");
+        }
+
+        function revealRoom(roomId) {
+            if (roomId === -1 || roomId === undefined) return;
+            const room = rooms.find(r => r.id === roomId);
+            if (room) {
+                 if (DEBUG_LOGGING) console.log(`Revealing Room ${roomId}`);
+                // Reveal floor tiles
+                room.tiles.forEach(tilePos => {
+                    if (board[tilePos.r] && board[tilePos.r][tilePos.c]) {
+                         board[tilePos.r][tilePos.c].visible = true;
+                    }
+                });
+                // Reveal the 1-tile thick wall/door border of this room cell
+                for (let localR = 0; localR < ROOM_FOOTPRINT_HEIGHT; localR++) {
+                    for (let localC = 0; localC < ROOM_FOOTPRINT_WIDTH; localC++) {
+                        if (localR === 0 || localR === ROOM_FOOTPRINT_HEIGHT - 1 || localC === 0 || localC === ROOM_FOOTPRINT_WIDTH - 1) {
+                            const absR = room.originR + localR;
+                            const absC = room.originC + localC;
+                            if (absR >= 0 && absR < TOTAL_TILES_HIGH && absC >= 0 && absC < TOTAL_TILES_WIDE &&
+                                board[absR][absC]) {
+                                board[absR][absC].visible = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        function populateEnemies(startRoomId) { 
+            if (DEBUG_LOGGING) console.log("Populating enemies...");
+            enemies = []; 
+            
+            rooms.forEach(room => {
+                if (room.id === startRoomId) {
+                    if (DEBUG_LOGGING) console.log(`Skipping enemy placement in Start Room ${room.id}`);
+                    return; 
+                }
+
+                const numEnemiesInThisRoom = Math.floor(Math.random() * 3) + 1; 
+                if (DEBUG_LOGGING) console.log(`Attempting to place ${numEnemiesInThisRoom} enemies in Room ${room.id}`);
+                let enemiesPlacedInThisRoom = 0;
+
+                const availableTiles = room.tiles.filter(tilePos => 
+                    board[tilePos.r][tilePos.c].piece === null && board[tilePos.r][tilePos.c].type === 'floor'
+                );
+                for (let i = availableTiles.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [availableTiles[i], availableTiles[j]] = [availableTiles[j], availableTiles[i]];
+                }
+
+                for (let i = 0; i < numEnemiesInThisRoom && availableTiles.length > 0; i++) {
+                    const pos = availableTiles.pop(); 
+                    if (pos) { 
+                        const enemyTypes = Object.keys(ENEMY_PIECES);
+                        const randomEnemyTypeKey = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+                        const enemyProto = ENEMY_PIECES[randomEnemyTypeKey];
+                        const newEnemy = {
+                            row: pos.r, col: pos.c, type: randomEnemyTypeKey,
+                            emoji: enemyProto.emoji, eloValue: enemyProto.eloValue,
+                            color: 'black', isPlayer: false, id: `enemy-${room.id}-${i}-${Date.now()}`
+                        };
+                        board[pos.r][pos.c].piece = newEnemy;
+                        enemies.push(newEnemy);
+                        enemiesPlacedInThisRoom++;
+                        if (DEBUG_LOGGING) console.log(`  Placed Enemy ${newEnemy.emoji} (${newEnemy.type}) at (${pos.r}, ${pos.c}) in Room ${room.id}`);
+                    } else {
+                        if (DEBUG_LOGGING) console.warn(`  No available tile to place enemy ${i+1} in Room ${room.id}`);
+                        break; 
+                    }
+                }
+                if (DEBUG_LOGGING && enemiesPlacedInThisRoom < numEnemiesInThisRoom) {
+                    console.warn(`  Could only place ${enemiesPlacedInThisRoom} out of ${numEnemiesInThisRoom} desired enemies in Room ${room.id} (not enough space or tiles).`);
+                }
+                 if (DEBUG_LOGGING && enemiesPlacedInThisRoom === 0 && numEnemiesInThisRoom > 0) {
+                    console.warn(`  FAILED to place any of the ${numEnemiesInThisRoom} enemies in Room ${room.id}. This room will be empty.`);
+                }
+            });
+            if (DEBUG_LOGGING) console.log("Enemy population finished. Total enemies: " + enemies.length);
+        }
+
+
+        // --- Drawing ---
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let r_draw = 0; r_draw < TOTAL_TILES_HIGH; r_draw++) { 
+                for (let c_draw = 0; c_draw < TOTAL_TILES_WIDE; c_draw++) { 
+                    const tile = board[r_draw][c_draw];
+                    const x = c_draw * TILE_SIZE;
+                    const y = r_draw * TILE_SIZE;
+
+                    if (!tile.visible && gameState !== 'gameOver') { 
+                        ctx.fillStyle = FOG_COLOR;
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                        continue;
+                    }
+
+                    if (tile.type === 'floor' || tile.type === 'door' || tile.type === 'exit') {
+                         ctx.fillStyle = (r_draw + c_draw) % 2 === 0 ? FLOOR_LIGHT_COLOR : FLOOR_DARK_COLOR;
+                         ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                         if (tile.type === 'door') {
+                            ctx.fillStyle = DOOR_COLOR; 
+                            ctx.beginPath(); 
+                            ctx.arc(x + TILE_SIZE / 2, y + TILE_SIZE / 2, TILE_SIZE / 3, 0, 2 * Math.PI);
+                            ctx.fill();
+                         } else if (tile.type === 'exit') {
+                            ctx.fillStyle = LEVEL_EXIT_COLOR; 
+                            ctx.fillRect(x + TILE_SIZE/4, y + TILE_SIZE/4, TILE_SIZE/2, TILE_SIZE/2);
+                         }
+                    } else if (tile.type === 'wall') {
+                        ctx.fillStyle = WALL_COLOR;
+                        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    }
+                    if (tile.piece) {
+                        ctx.fillStyle = PIECE_DRAW_COLOR; 
+                        ctx.font = `${TILE_SIZE * 0.7}px Arial`; 
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        const pieceEmoji = tile.piece.isPlayer ? PLAYER_PIECES[tile.piece.type].emoji : tile.piece.emoji;
+                        ctx.fillText(pieceEmoji, x + TILE_SIZE / 2, y + TILE_SIZE / 2 + TILE_SIZE * 0.05); 
+                    }
+                }
+            }
+            if (gameState === 'playerTurn' && validMoves) {
+                validMoves.forEach(move => {
+                    const x = move.c * TILE_SIZE;
+                    const y = move.r * TILE_SIZE;
+                    ctx.fillStyle = move.isAttack ? HIGHLIGHT_ATTACK_MOVE_COLOR : HIGHLIGHT_VALID_MOVE_COLOR;
+                    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+                    if (board[move.r][move.c].piece) {
+                        ctx.fillStyle = PIECE_DRAW_COLOR; 
+                        ctx.font = `${TILE_SIZE * 0.7}px Arial`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        const pieceToRedraw = board[move.r][move.c].piece;
+                        const emojiToRedraw = pieceToRedraw.isPlayer ? PLAYER_PIECES[pieceToRedraw.type].emoji : pieceToRedraw.emoji;
+                        ctx.fillText(emojiToRedraw, x + TILE_SIZE / 2, y + TILE_SIZE / 2 + TILE_SIZE * 0.05);
+                    }
+                });
+            }
+        }
+
+        // --- Piece Movement Logic ---
+        function getValidMoves(piece, r_current, c_current) { 
+            const moves = [];
+            const type = piece.type;
+            const color = piece.color;
+
+            function addMoveIfValid(nR, nC, isAttackOnly = false, isMoveOnly = false) { 
+                if (nR >= 0 && nR < TOTAL_TILES_HIGH && nC >= 0 && nC < TOTAL_TILES_WIDE) {
+                    const targetTile = board[nR][nC];
+                    if (targetTile.type === 'wall') return; 
+
+                    const pieceOnTarget = targetTile.piece;
+                    if (pieceOnTarget) { 
+                        if (pieceOnTarget.color !== color && !isMoveOnly) { 
+                            moves.push({ r: nR, c: nC, isAttack: true });
+                        }
+                    } else { 
+                        if (!isAttackOnly) {
+                             moves.push({ r: nR, c: nC, isAttack: false });
+                        }
+                    }
+                }
+            }
+            
+            if (type === PIECE_TYPES.PAWN) {
+                if (piece.isPlayer) { 
+                    const playerPawnMoveDirs = [[-1,0], [1,0], [0,-1], [0,1]]; 
+                    playerPawnMoveDirs.forEach(dir => {
+                        const nR_move = r_current + dir[0]; 
+                        const nC_move = c_current + dir[1]; 
+                         if (nR_move >= 0 && nR_move < TOTAL_TILES_HIGH && nC_move >= 0 && nC_move < TOTAL_TILES_WIDE &&
+                            board[nR_move][nC_move].type !== 'wall' && !board[nR_move][nC_move].piece) {
+                             moves.push({ r: nR_move, c: nC_move, isAttack: false });
+                         }
+                    });
+                    const playerPawnAttackDirs = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+                    playerPawnAttackDirs.forEach(dir => {
+                        addMoveIfValid(r_current + dir[0], c_current + dir[1], true, false); 
+                    });
+
+                } else { 
+                    const direction = 1; 
+                    if (r_current + direction < TOTAL_TILES_HIGH) { 
+                        if (board[r_current + direction][c_current] && !board[r_current + direction][c_current].piece) {
+                            addMoveIfValid(r_current + direction, c_current, false, true); 
+                        }
+                        if (c_current - 1 >= 0 && board[r_current + direction][c_current - 1]) addMoveIfValid(r_current + direction, c_current - 1, true, false);
+                        if (c_current + 1 < TOTAL_TILES_WIDE && board[r_current + direction][c_current + 1]) addMoveIfValid(r_current + direction, c_current + 1, true, false);
+                    }
+                }
+            } else if (type === PIECE_TYPES.KNIGHT) {
+                const knightMoves = [
+                    [-2, -1], [-2, 1], [-1, -2], [-1, 2],
+                    [1, -2], [1, 2], [2, -1], [2, 1]
+                ];
+                knightMoves.forEach(m => addMoveIfValid(r_current + m[0], c_current + m[1]));
+            } else { 
+                let slideDirections = []; 
+                if (type === PIECE_TYPES.ROOK) {
+                    slideDirections = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+                } else if (type === PIECE_TYPES.BISHOP) {
+                    slideDirections = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+                } else if (type === PIECE_TYPES.QUEEN) {
+                    slideDirections = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]];
+                }
+                for (const dir of slideDirections) {
+                    for (let i = 1; ; i++) {
+                        const nR_slide = r_current + dir[0] * i; 
+                        const nC_slide = c_current + dir[1] * i; 
+                        if (nR_slide < 0 || nR_slide >= TOTAL_TILES_HIGH || nC_slide < 0 || nC_slide >= TOTAL_TILES_WIDE) break;
+                        const targetTileSlide = board[nR_slide][nC_slide]; 
+                        if (targetTileSlide.type === 'wall') break; 
+                        if (targetTileSlide.piece) {
+                            if (targetTileSlide.piece.color !== color) {
+                                moves.push({ r: nR_slide, c: nC_slide, isAttack: true }); 
+                            }
+                            break; 
+                        }
+                        moves.push({ r: nR_slide, c: nC_slide, isAttack: false }); 
+                    }
+                }
+            }
+            return moves;
+        }
+        
+        function calculatePlayerValidMoves() {
+            if (player && player.row !== undefined && player.row !== -1) { 
+                 validMoves = getValidMoves(player, player.row, player.col);
+            } else {
+                validMoves = [];
+            }
+        }
+
+        // --- Player Input & Actions ---
+        function handleCanvasClick(event) {
+            if (gameState !== 'playerTurn' || playerActionsRemaining <= 0) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+            const c_click = Math.floor(clickX / TILE_SIZE); 
+            const r_click = Math.floor(clickY / TILE_SIZE); 
+
+            if (r_click >= 0 && r_click < TOTAL_TILES_HIGH && c_click >= 0 && c_click < TOTAL_TILES_WIDE) {
+                const clickedMove = validMoves.find(move => move.r === r_click && move.c === c_click);
+                if (clickedMove) {
+                    performPlayerAction(() => performPlayerMove(clickedMove.r, clickedMove.c), 1); 
+                }
+            }
+        }
+        
+        function performPlayerAction(actionFn, cost) {
+            if (playerActionsRemaining >= cost) {
+                actionFn(); 
+                playerActionsRemaining -= cost;
+                Object.keys(PLAYER_PIECES).forEach(type => {
+                    if (player.elo >= PLAYER_PIECES[type].eloToUnlock && !player.unlockedPieces.includes(type)) {
+                        player.unlockedPieces.push(type);
+                        addMessage(`Unlocked transformation: ${PLAYER_PIECES[type].emoji} ${type}!`, "system");
+                    }
+                });
+                checkEndPlayerTurnActions();
+            } else {
+                addMessage("Not enough actions for that!", "system");
+            }
+        }
+
+        function performPlayerMove(nR_target, nC_target) { 
+            const targetTile = board[nR_target][nC_target];
+            let message = `Player (${PLAYER_PIECES[player.type].emoji}) moves to (${nR_target},${nC_target}).`;
+
+            if (targetTile.piece && targetTile.piece.color === 'black') { 
+                const enemy = targetTile.piece;
+                message += ` Captures ${enemy.emoji}! +${enemy.eloValue} ELO.`;
+                player.elo += enemy.eloValue;
+                enemies = enemies.filter(e => e.id !== enemy.id); 
+            }
+
+            board[player.row][player.col].piece = null;
+            player.row = nR_target;
+            player.col = nC_target;
+            board[nR_target][nC_target].piece = player;
+
+            if (targetTile.type === 'door') {
+                const neighborOffsets = [[-1,0], [1,0], [0,-1], [0,1]];
+                for (const offset of neighborOffsets) {
+                    const checkR = nR_target + offset[0];
+                    const checkC = nC_target + offset[1];
+                    if (checkR >= 0 && checkR < TOTAL_TILES_HIGH && checkC >= 0 && checkC < TOTAL_TILES_WIDE) {
+                        const neighborTile = board[checkR][checkC];
+                        if (neighborTile.type === 'floor' && neighborTile.roomId !== -1 && neighborTile.roomId !== player.currentRoomId) {
+                            const adjRoom = rooms.find(room => room.id === neighborTile.roomId);
+                            if (adjRoom && adjRoom.tiles.some(t => !board[t.r][t.c].visible)) {
+                                revealRoom(neighborTile.roomId);
+                                message += ` Discovered passage.`;
+                            }
+                        }
+                    }
+                }
+            } else if (targetTile.type === 'floor' && targetTile.roomId !== -1 && targetTile.roomId !== player.currentRoomId) {
+                player.currentRoomId = targetTile.roomId;
+                revealRoom(player.currentRoomId); 
+                message += ` Enters new room.`;
+            }
+            
+            addMessage(message, "player");
+
+            if (targetTile.type === 'exit') { 
+                levelComplete(); 
+                return; 
+            }
+        }
+        
+        function handleTransform(newPieceType) {
+            if (gameState !== 'playerTurn') return;
+            const pieceData = PLAYER_PIECES[newPieceType];
+            const actionCost = pieceData.transformCost;
+
+            if (player.unlockedPieces.includes(newPieceType) && player.type !== newPieceType) { 
+                 performPlayerAction(() => {
+                    addMessage(`Player transforms into ${pieceData.emoji} ${newPieceType}.`, "system");
+                    player.type = newPieceType;
+                 }, actionCost);
+            } else if (!player.unlockedPieces.includes(newPieceType)){
+                addMessage(`Piece ${newPieceType} not unlocked. Needs ${pieceData.eloToUnlock} ELO.`, "system");
+            } else if (player.type === newPieceType) {
+                 addMessage(`Already a ${newPieceType}.`, "system");
+            }
+        }
+
+        function checkEndPlayerTurnActions() {
+            updateUI(); 
+            if (gameState === 'levelComplete' || gameState === 'gameOver') return;
+
+            if (playerActionsRemaining <= 0) {
+                addMessage("Player has no actions left.", "system");
+                endPlayerTurn(); 
+            } else {
+                calculatePlayerValidMoves(); 
+                drawGame(); 
+                addMessage(`Player has ${playerActionsRemaining} actions left.`, "player");
+            }
+        }
+
+        function endPlayerTurn() {
+            updateUI(); 
+            validMoves = []; 
+            drawGame();
+
+            if (gameState === 'gameOver' || gameState === 'levelComplete') return;
+
+            gameState = 'enemyTurn';
+            setTimeout(processEnemyTurns, 300); 
+        }
+
+
+        // --- Enemy AI & Turn Logic ---
+        async function processEnemyTurns() {
+            if (DEBUG_LOGGING) console.log("--- Processing Enemy Turns ---");
+            if (gameState !== 'enemyTurn') return;
+
+            for (const enemy of enemies) {
+                if (DEBUG_LOGGING) console.log(`Processing enemy: ${enemy.emoji} at (${enemy.row}, ${enemy.col})`);
+                if (gameState === 'gameOver' || gameState === 'levelComplete') break; 
+
+                const enemyTile = board[enemy.row][enemy.col];
+                const enemyRoomId = enemyTile ? enemyTile.roomId : -1;
+                const enemyRoom = rooms.find(r => r.id === enemyRoomId);
+
+                let enemyIsVisibleOrClose = false;
+                if (enemyRoom) {
+                    enemyIsVisibleOrClose = enemyRoom.tiles.some(t => board[t.r][t.c].visible) || enemyRoomId === player.currentRoomId;
+                }
+                if (DEBUG_LOGGING) console.log(`  Enemy ${enemy.emoji} visible/close: ${enemyIsVisibleOrClose}`);
+                
+                const enemyMoves = getValidMoves(enemy, enemy.row, enemy.col);
+                if (enemyMoves.length > 0) {
+                    let bestMove = null;
+                    let attackMoves = enemyMoves.filter(m => m.isAttack && board[m.r][m.c].piece && board[m.r][m.c].piece.isPlayer);
+                    
+                    if (attackMoves.length > 0) {
+                        bestMove = attackMoves[0]; 
+                        if (DEBUG_LOGGING) console.log(`  Enemy ${enemy.emoji} can attack player at (${bestMove.r}, ${bestMove.c})`);
+                    } else if (enemyIsVisibleOrClose) { 
+                        let minDistance = Infinity;
+                        enemyMoves.forEach(move => {
+                            if (board[move.r][move.c].piece && !board[move.r][move.c].piece.isPlayer) return;
+                            const dist = Math.sqrt(Math.pow(move.r - player.row, 2) + Math.pow(move.c - player.col, 2));
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                bestMove = move;
+                            }
+                        });
+                        if (bestMove && DEBUG_LOGGING) console.log(`  Enemy ${enemy.emoji} moving towards player. Best move to: (${bestMove.r}, ${bestMove.c})`);
+                    } 
+
+                    if (bestMove) {
+                        const oldR_enemy = enemy.row; 
+                        const oldC_enemy = enemy.col; 
+                        const targetTile_enemy = board[bestMove.r][bestMove.c]; 
+
+                        if (targetTile_enemy.piece && targetTile_enemy.piece.isPlayer) { 
+                            let enemyMsg = `Enemy ${enemy.emoji} at (${oldR_enemy},${oldC_enemy}) captures player ${PLAYER_PIECES[player.type].emoji}!`;
+                            addMessage(enemyMsg, "enemy");
+                            board[oldR_enemy][oldC_enemy].piece = null; 
+                            gameOver("You were captured by " + enemy.emoji + "!");
+                            return; 
+                        } else {
+                            board[oldR_enemy][oldC_enemy].piece = null;
+                            enemy.row = bestMove.r;
+                            enemy.col = bestMove.c;
+                            board[bestMove.r][bestMove.c].piece = enemy;
+                        }
+                    } else {
+                         if (DEBUG_LOGGING) console.log(`  Enemy ${enemy.emoji} has no best move this turn.`);
+                    }
+                } else {
+                    if (DEBUG_LOGGING) console.log(`  Enemy ${enemy.emoji} has no valid moves.`);
+                }
+                if (enemyIsVisibleOrClose) {
+                    drawGame(); 
+                    await new Promise(resolve => setTimeout(resolve, 150)); 
+                }
+            }
+            
+            if (gameState !== 'gameOver' && gameState !== 'levelComplete') {
+                gameState = 'playerTurn';
+                playerActionsRemaining = MAX_PLAYER_ACTIONS_PER_TURN;
+                gameTurns++; 
+                calculatePlayerValidMoves();
+                addMessage(`Player's turn. You have ${playerActionsRemaining} actions. (Turn ${gameTurns})`, "system");
+            }
+            updateUI(); 
+            drawGame(); 
+            if (DEBUG_LOGGING) console.log("--- Enemy Turns Complete ---");
+        }
+
+        // --- Game Flow & UI ---
+        function updateUI() {
+            eloDisplay.textContent = player.elo;
+            currentPieceDisplay.textContent = `${player.type.charAt(0).toUpperCase() + player.type.slice(1)} (${PLAYER_PIECES[player.type].emoji})`;
+            actionsLeftDisplay.textContent = playerActionsRemaining;
+            turnsDisplay.textContent = gameTurns;
+            levelDisplay.textContent = currentLevel;
+
+            transformButtonsContainer.innerHTML = '';
+            Object.keys(PLAYER_PIECES).forEach(type => {
+                if (type === PIECE_TYPES.KING) return; 
+                const pieceData = PLAYER_PIECES[type];
+                const button = document.createElement('button');
+                button.textContent = `${pieceData.emoji} ${type.charAt(0).toUpperCase() + type.slice(1)} (${pieceData.transformCost}a)`;
+                if (!player.unlockedPieces.includes(type)) {
+                    button.disabled = true;
+                    button.title = `Locked (Needs ${pieceData.eloToUnlock} ELO)`;
+                } else if (player.type === type) {
+                    button.disabled = true;
+                    button.title = 'Already this piece';
+                } else if (playerActionsRemaining < pieceData.transformCost) {
+                    button.disabled = true;
+                    button.title = `Not enough actions (needs ${pieceData.transformCost})`;
+                } else {
+                    button.disabled = gameState !== 'playerTurn';
+                    button.title = `Transform (Costs ${pieceData.transformCost} action(s))`;
+                }
+                button.onclick = () => handleTransform(type);
+                transformButtonsContainer.appendChild(button);
+            });
+        }
+
+        function addMessage(text, type = "system") { 
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', type);
+            messageDiv.textContent = `[T${gameTurns}] ${text}`; 
+            messageLogElement.appendChild(messageDiv);
+            messageLogElement.scrollTop = messageLogElement.scrollHeight; 
+        }
+
+        function gameOver(message) {
+            gameState = 'gameOver';
+            addMessage(message, "system");
+            gameOverTitle.textContent = "Game Over!";
+            gameOverMessage.textContent = message;
+            restartGameButton.textContent = "Play Again"; 
+            gameOverModal.style.display = 'flex';
+            validMoves = []; 
+            for (let r_map_reveal = 0; r_map_reveal < TOTAL_TILES_HIGH; r_map_reveal++) { 
+                for (let c_map_reveal = 0; c_map_reveal < TOTAL_TILES_WIDE; c_map_reveal++) {
+                    if(board[r_map_reveal] && board[r_map_reveal][c_map_reveal]) { 
+                        board[r_map_reveal][c_map_reveal].visible = true;
+                    }
+                }
+            }
+            drawGame();
+        }
+
+        function levelComplete() {
+            gameState = 'levelComplete'; 
+            addMessage(`Level ${currentLevel} complete! Player ELO: ${player.elo}. Unlocked: ${player.unlockedPieces.join(', ')}`, "system");
+            gameOverTitle.textContent = "Level Complete!";
+            gameOverMessage.textContent = `You beat level ${currentLevel}! Your ELO is ${player.elo}. Proceed to level ${currentLevel + 1}?`;
+            restartGameButton.textContent = `Start Level ${currentLevel + 1}`;
+            gameOverModal.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
