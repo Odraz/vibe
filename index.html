@@ -62,15 +62,17 @@
         }
         .file-entry {
             display: flex;
-            justify-content: space-between;
+            align-items: center; /* Align items vertically */
             width: 100%;
         }
         .file-name {
             flex-grow: 1;
         }
-        .file-type {
-            min-width: 60px; /* Ensure alignment */
-            text-align: right;
+        .shortcut-key {
+            min-width: 40px; /* Ensure alignment for shortcut */
+            text-align: left;
+            margin-right: 10px; /* Space between shortcut and name */
+            color: #ffff00; /* Yellow color for shortcut */
         }
         /* Ensure content doesn't get cut off by fixed scanline */
         .content-wrapper {
@@ -85,7 +87,9 @@
         <div class="mb-4 text-lg">
             <p>Odraz Game Hub v1.0</p>
             <p>(c) 2025 snecimajizuby</p>
+            <p>---</p>
             <p>Booting sequence complete...</p>
+            <p>Press corresponding key to launch game.</p>
             <p>Ready.</p>
         </div>
 
@@ -101,52 +105,66 @@
 
     <script>
         const games = [
-            { name: "ASTEROID_CLICKER", path: "asteroid_clicker/index.html", size: "12KB" },
-            { name: "CHESSLIKE_ROGUE", path: "chesslike_rogue/index.html", size: "25KB" },
-            { name: "EMOTE_AND_EVADE", path: "emote_and_evade/index.html", size: "18KB" },
-            { name: "EMOTICONUNDRUM", path: "emoticonundrum/index.html", size: "30KB" },
-            { name: "HOCKEY_RAMPAGE", path: "hockey_rampage/index.html", size: "45KB" },
-            { name: "TERRAFORMING_MARS", path: "terraforming_mars/index.html", size: "22KB" },
-            { name: "TURN_BASED_BOMBERMAN", path: "turn_based_bomberman/index.html", size: "35KB" }
+            { name: "ASTEROID_CLICKER", path: "asteroid_clicker/index.html" },
+            { name: "CHESSLIKE_ROGUE", path: "chesslike_rogue/index.html" },
+            { name: "EMOTE_AND_EVADE", path: "emote_and_evade/index.html" },
+            { name: "EMOTICONUNDRUM", path: "emoticonundrum/index.html" },
+            { name: "HOCKEY_RAMPAGE", path: "hockey_rampage/index.html" },
+            { name: "TERRAFORMING_MARS", path: "terraforming_mars/index.html" },
+            { name: "TURN_BASED_BOMBERMAN", path: "turn_based_bomberman/index.html" },
+            // Add more games here, up to 35 (9 numbers + 26 letters)
+            // { name: "ANOTHER_GAME_1", path: "another_game_1/index.html" },
+            // { name: "ANOTHER_GAME_2", path: "another_game_2/index.html" },
+            // { name: "ANOTHER_GAME_3", path: "another_game_3/index.html" },
         ];
 
         const gameListElement = document.getElementById('game-list');
-        let charIndex = 0;
+        const shortcutChars = "123456789abcdefghijklmnopqrstuvwxyz";
+        const gameShortcuts = {}; // To store shortcut key -> game path mapping
+
         let gameEntryIndex = 0;
-        const typingSpeed = 20; // Milliseconds per character
 
         function typeGameEntries() {
-            if (gameEntryIndex < games.length) {
+            if (gameEntryIndex < games.length && gameEntryIndex < shortcutChars.length) {
                 const game = games[gameEntryIndex];
+                const shortcutKey = shortcutChars[gameEntryIndex];
+                gameShortcuts[shortcutKey] = game.path; // Map shortcut to path
+
                 const p = document.createElement('p');
                 p.classList.add('file-entry');
-                
+
+                // Create span for the shortcut key
+                const shortcutSpan = document.createElement('span');
+                shortcutSpan.classList.add('shortcut-key');
+                shortcutSpan.textContent = `[${shortcutKey}]`;
+
+                // Create link for the game name
                 const link = document.createElement('a');
                 link.href = game.path;
                 link.textContent = game.name;
                 link.classList.add('terminal-link', 'file-name');
                 link.target = "_blank"; // Open in new tab
+                link.setAttribute('data-shortcut', shortcutKey); // Store shortcut for potential future use
 
-                const typeSpan = document.createElement('span');
-                typeSpan.classList.add('file-type');
-                typeSpan.textContent = `[DIR]`; // Indicate it's a directory/link
-
-                const sizeSpan = document.createElement('span');
-                sizeSpan.classList.add('ml-4', 'text-right'); // Added text-right for size
-                sizeSpan.textContent = game.size;
-                
+                p.appendChild(shortcutSpan); // Add shortcut span first
                 p.appendChild(link);
-                p.appendChild(typeSpan);
-                p.appendChild(sizeSpan);
                 gameListElement.appendChild(p);
-                
-                // Simple reveal, no character-by-character typing for list items for now
-                gameEntryIndex++;
-                setTimeout(typeGameEntries, 100); // Delay between showing each game entry
 
+                gameEntryIndex++;
+                // Delay between showing each game entry for a "typing" effect
+                setTimeout(typeGameEntries, 100);
             }
         }
-        
+
+        // Event listener for key presses
+        document.addEventListener('keypress', function(event) {
+            const pressedKey = event.key.toLowerCase(); // Get the pressed key, convert to lowercase
+            if (gameShortcuts[pressedKey]) {
+                // If the pressed key is a defined shortcut, open the corresponding game path
+                window.open(gameShortcuts[pressedKey], '_blank');
+            }
+        });
+
         // Start typing animation for game entries
         // Slight delay to simulate "command execution"
         setTimeout(typeGameEntries, 250);
