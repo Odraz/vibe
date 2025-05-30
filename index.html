@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Odraz's Vibe Game Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cyber-bg: #0d0221; /* Deep void purple */
+            --cyber-primary: #00f0ff; /* Neon cyan */
+            --cyber-secondary: #ff00ff; /* Neon magenta */
+            --cyber-accent: #faff00; /* Neon yellow */
+            --cyber-text: #e0e0e0;
+            --cyber-border: #2a0e59; /* Darker purple for borders */
+            --font-primary: 'Orbitron', sans-serif;
+            --font-secondary: 'Share Tech Mono', monospace;
+        }
+
+        body {
+            font-family: var(--font-secondary);
+            background-color: var(--cyber-bg);
+            color: var(--cyber-text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .cyber-container {
+            width: 100%;
+            max-width: 900px;
+            background-color: rgba(13, 2, 33, 0.85); /* Semi-transparent void purple */
+            border: 2px solid var(--cyber-primary);
+            border-radius: 10px;
+            box-shadow: 0 0 25px var(--cyber-primary), inset 0 0 15px rgba(0, 240, 255, 0.3);
+            padding: 30px;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .cyber-header {
+            font-family: var(--font-primary);
+            font-size: 2.8rem; /* Increased size */
+            color: var(--cyber-primary);
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 5px var(--cyber-primary), 0 0 10px var(--cyber-primary), 0 0 15px var(--cyber-secondary);
+            animation: glitch 2s infinite alternate-reverse;
+        }
+        
+        .cyber-header-subtext {
+            font-family: var(--font-secondary);
+            font-size: 1rem;
+            color: var(--cyber-secondary);
+            text-align: center;
+            margin-top: -20px;
+            margin-bottom: 35px;
+            text-shadow: 0 0 3px var(--cyber-secondary);
+        }
+
+        @keyframes glitch {
+            0% { text-shadow: 0 0 5px var(--cyber-primary), 0 0 10px var(--cyber-primary), 0 0 15px var(--cyber-secondary), 1px 1px var(--cyber-accent), -1px -1px var(--cyber-secondary); }
+            25% { text-shadow: 0 0 5px var(--cyber-primary), 0 0 10px var(--cyber-primary), 0 0 15px var(--cyber-secondary), -1px 1px var(--cyber-accent), 1px -1px var(--cyber-secondary); }
+            50% { text-shadow: 0 0 5px var(--cyber-primary), 0 0 10px var(--cyber-primary), 0 0 15px var(--cyber-secondary), 1px -1px var(--cyber-accent), -1px 1px var(--cyber-secondary); }
+            75% { text-shadow: 0 0 5px var(--cyber-primary), 0 0 10px var(--cyber-primary), 0 0 15px var(--cyber-secondary), -1px -1px var(--cyber-accent), 1px 1px var(--cyber-secondary); }
+            100% { text-shadow: 0 0 5px var(--cyber-primary), 0 0 10px var(--cyber-primary), 0 0 15px var(--cyber-secondary), 0 0 var(--cyber-accent), 0 0 var(--cyber-secondary); }
+        }
+
+        .game-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .game-item {
+            background-color: rgba(42, 14, 89, 0.6); /* Darker purple, slightly transparent */
+            border: 1px solid var(--cyber-secondary);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .game-item:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 0 15px var(--cyber-secondary), 0 0 5px var(--cyber-primary);
+        }
+
+        .game-link {
+            display: block;
+            padding: 20px;
+            font-size: 1.3rem;
+            color: var(--cyber-accent);
+            text-decoration: none;
+            font-family: var(--font-secondary);
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+            text-align: center;
+        }
+
+        .game-link:hover {
+            color: var(--cyber-primary);
+            text-shadow: 0 0 8px var(--cyber-primary);
+        }
+        
+        .game-link::before {
+            content: '► ';
+            color: var(--cyber-secondary);
+            margin-right: 10px;
+            transition: color 0.3s ease;
+        }
+        .game-link:hover::before {
+            color: var(--cyber-primary);
+        }
+
+        /* Decorative elements */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(13, 2, 33, 0) 70%, rgba(13, 2, 33, 0.7)),
+                        radial-gradient(ellipse at bottom, var(--cyber-primary) 0%, transparent 60%);
+            opacity: 0.3;
+            pointer-events: none;
+            z-index: -1;
+            animation: backgroundPulse 10s infinite alternate;
+        }
+        @keyframes backgroundPulse {
+            from { opacity: 0.2; }
+            to { opacity: 0.4; }
+        }
+        
+        .cyber-footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--cyber-secondary);
+            opacity: 0.7;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .cyber-header {
+                font-size: 2rem;
+            }
+            .game-link {
+                font-size: 1.1rem;
+                padding: 15px;
+            }
+            .cyber-container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="cyber-container">
+        <header>
+            <h1 class="cyber-header">VibeNet Game Hub</h1>
+            <p class="cyber-header-subtext">Unauthorized Access Detected... Engaging Game Protocols...</p>
+        </header>
+
+        <main>
+            <ul class="game-list" id="gameList">
+                </ul>
+        </main>
+    </div>
+    <footer class="cyber-footer">
+        &copy; 2077 VibeNet Corp. All rights reserved. System Integrity: Nominal.
+    </footer>
+
+    <script>
+        // This script will dynamically populate the game list.
+        // In a real scenario, you might fetch this data or have it pre-rendered.
+        const games = [
+            { title: "Astro-Claster", url: "./asteroid_clicker/index.html", filePath: "asteroid_clicker/index.html" },
+            { title: "Chess Roguelike Adventure", url: "./chess_roguelike/index.html", filePath: "chess_roguelike/index.html" },
+            { title: "Emote & Evade: The Emoji Dungeon", url: "./emote_and_evade/index.html", filePath: "emote_and_evade/index.html" },
+            { title: "Emoticonundrum", url: "./emoticonundrum/index.html", filePath: "emoticonundrum/index.html" },
+            { title: "Czech Hockey Rampage", url: "./hockey_rampage/index.html", filePath: "hockey_rampage/index.html" },
+            { title: "Mars Clicker: Red Planet Transformer", url: "./terraforming_mars/index.html", filePath: "terraforming_mars/index.html" },
+            { title: "Bot Blast Tactics", url: "./turn_based_bomberman/index.html", filePath: "turn_based_bomberman/index.html" }
+        ];
+
+        const gameListElement = document.getElementById('gameList');
+
+        games.forEach(game => {
+            const listItem = document.createElement('li');
+            listItem.classList.add('game-item');
+
+            const link = document.createElement('a');
+            link.classList.add('game-link');
+            link.href = game.url;
+            link.textContent = game.title;
+            // In a real deployment, you'd link to the actual game URLs.
+            // For this example, clicking will try to navigate to a local path.
+            // If these files are in the same directory structure, it might work.
+
+            listItem.appendChild(link);
+            gameListElement.appendChild(listItem);
+        });
+
+        // Console message for cyberpunk feel
+        console.log("%c[VibeNet OS v4.2.7 booting...]", "color: #00f0ff; font-family: 'Share Tech Mono', monospace; font-size: 14px;");
+        console.log("%cSystem Check: All cores nominal. Game protocols engaged.", "color: #ff00ff; font-family: 'Share Tech Mono', monospace;");
+        console.log("%cWelcome, Operator. Select your interface.", "color: #e0e0e0; font-family: 'Share Tech Mono', monospace;");
+
+    </script>
+</body>
+</html>
