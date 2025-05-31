@@ -79,6 +79,21 @@
             position: relative;
             z-index: 1;
         }
+
+        /* Styles for Buy Me a Coffee button container */
+        .bmc-button-container {
+            position: fixed; /* Fixed position relative to the viewport */
+            bottom: 20px;    /* 20px from the bottom */
+            right: 20px;     /* 20px from the right */
+            z-index: 1001;   /* Ensure it's above the scanline and other content */
+            transform: scale(0.7); /* Scale the button down to 80% */
+            transform-origin: bottom right; /* Scale from the bottom right corner */
+            transition: transform 0.2s ease-in-out; /* Add transition for smooth animation */
+        }
+
+        .bmc-button-container:hover {
+            transform: scale(0.73); /* Scale up slightly on hover, maintaining origin */
+        }
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-2 sm:p-4">
@@ -104,6 +119,7 @@
     </div>
 
     <script>
+        // Array of game objects, each with a name and path
         const games = [
             { name: "ASTEROID_CLICKER", path: "asteroid_clicker/index.html" },
             { name: "CHESSLIKE_ROGUE", path: "chesslike_rogue/index.html" },
@@ -119,56 +135,61 @@
         ];
 
         const gameListElement = document.getElementById('game-list');
-        const shortcutChars = "123456789abcdefghijklmnopqrstuvwxyz";
-        const gameShortcuts = {}; // To store shortcut key -> game path mapping
+        const shortcutChars = "123456789abcdefghijklmnopqrstuvwxyz"; // Characters for shortcuts
+        const gameShortcuts = {}; // Object to store shortcut key -> game path mapping
 
-        let gameEntryIndex = 0;
+        let gameEntryIndex = 0; // Index for iterating through games for the typing effect
 
+        // Function to simulate typing game entries into the terminal
         function typeGameEntries() {
             if (gameEntryIndex < games.length && gameEntryIndex < shortcutChars.length) {
                 const game = games[gameEntryIndex];
                 const shortcutKey = shortcutChars[gameEntryIndex];
-                gameShortcuts[shortcutKey] = game.path; // Map shortcut to path
+                gameShortcuts[shortcutKey] = game.path; // Map the shortcut key to the game's path
 
                 const p = document.createElement('p');
-                p.classList.add('file-entry');
+                p.classList.add('file-entry'); // Style for the game entry line
 
-                // Create span for the shortcut key
+                // Create a span for the shortcut key (e.g., "[1]")
                 const shortcutSpan = document.createElement('span');
                 shortcutSpan.classList.add('shortcut-key');
                 shortcutSpan.textContent = `[${shortcutKey}]`;
 
-                // Create link for the game name
+                // Create an anchor tag for the game name, making it clickable
                 const link = document.createElement('a');
                 link.href = game.path;
                 link.textContent = game.name;
                 link.classList.add('terminal-link', 'file-name');
-                link.target = "_blank"; // Open in new tab
-                link.setAttribute('data-shortcut', shortcutKey); // Store shortcut for potential future use
+                link.target = "_blank"; // Open game in a new tab
+                link.setAttribute('data-shortcut', shortcutKey); // Store shortcut key as a data attribute
 
-                p.appendChild(shortcutSpan); // Add shortcut span first
-                p.appendChild(link);
-                gameListElement.appendChild(p);
+                p.appendChild(shortcutSpan); // Add shortcut key span to the paragraph
+                p.appendChild(link);         // Add game link to the paragraph
+                gameListElement.appendChild(p); // Add the paragraph to the game list container
 
                 gameEntryIndex++;
-                // Delay between showing each game entry for a "typing" effect
-                setTimeout(typeGameEntries, 100);
+                // Set a timeout to type the next game entry, creating a typing animation effect
+                setTimeout(typeGameEntries, 100); // Adjust delay as needed (100ms here)
             }
         }
 
-        // Event listener for key presses
+        // Event listener for key presses to launch games using shortcuts
         document.addEventListener('keypress', function(event) {
-            const pressedKey = event.key.toLowerCase(); // Get the pressed key, convert to lowercase
+            const pressedKey = event.key.toLowerCase(); // Get the pressed key (convert to lowercase for consistency)
             if (gameShortcuts[pressedKey]) {
-                // If the pressed key is a defined shortcut, open the corresponding game path
+                // If the pressed key corresponds to a defined game shortcut, open the game's path in a new tab
                 window.open(gameShortcuts[pressedKey], '_blank');
             }
         });
 
-        // Start typing animation for game entries
-        // Slight delay to simulate "command execution"
-        setTimeout(typeGameEntries, 250);
+        // Start the typing animation for game entries after a short delay
+        // This simulates the "command execution" time before listing files
+        setTimeout(typeGameEntries, 250); // Adjust delay as needed (250ms here)
 
     </script>
+
+    <div class="bmc-button-container">
+        <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="pazmitch" data-color="#FFDD00" data-emoji="☕" data-font="Inter" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#000000" data-coffee-color="#ffffff" ></script>
+    </div>
 </body>
 </html>
