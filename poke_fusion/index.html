@@ -123,7 +123,7 @@
 
 
         <!-- Fusion Image -->
-        <div id="fusion-image-container" class="relative w-48 h-48 mx-auto mb-4 bg-gray-200 rounded-lg shadow-inner flex items-center justify-center overflow-hidden hidden">
+        <div id="fusion-image-container" class="relative w-48 h-48 mx-auto mb-4 bg-white rounded-lg shadow-inner flex items-center justify-center overflow-hidden hidden">
             <img id="fusion-image" class="w-40 h-40 object-contain" src="" alt="Fused Pokémon">
         </div>
 
@@ -169,6 +169,9 @@
                     <img id="result-img2" class="w-24 h-24 mx-auto" src="">
                     <p id="result-name2" class="font-bold capitalize"></p>
                 </div>
+            </div>
+            <div class="my-4">
+                <img id="modal-fused-image" class="w-32 h-32 mx-auto object-contain bg-white rounded-lg" src="" alt="Final Fused Pokémon">
             </div>
             <p class="mb-4">They fused to become... <b id="fused-name" class="text-xl text-blue-600"></b>!</p>
             
@@ -251,6 +254,7 @@
             const resultName2 = document.getElementById('result-name2');
             const fusedNameEl = document.getElementById('fused-name');
             const shareButton = document.getElementById('share-button');
+            const modalFusedImage = document.getElementById('modal-fused-image');
 
             // --- Game Initialization ---
             async function initGame() {
@@ -395,7 +399,7 @@
                 const payload = {
                     contents: [{
                         parts: [
-                            { text: "Fuse these two pokemon sprites into a single, cohesive hybrid creature on a transparent background. The new creature should blend features from both parents naturally. The style should match the pixel-art sprite style of the originals." },
+                            { text: "Fuse these two pokemon sprites into a single, cohesive hybrid creature on a clean white background. The new creature should blend features from both parents naturally. The style should match the pixel-art sprite style of the originals." },
                             { inlineData: { mimeType: "image/png", data: base64Img1 } },
                             { inlineData: { mimeType: "image/png", data: base64Img2 } }
                         ]
@@ -663,6 +667,7 @@
                 resultImg2.src = dailyPokemon.p2.sprite;
                 resultName2.textContent = dailyPokemon.p2.name;
                 fusedNameEl.textContent = dailyFusedName;
+                modalFusedImage.src = fusionImage.src;
                 
                 generateResultsHistory();
                 
@@ -801,6 +806,4 @@
     </script>
 </body>
 </html>
-
-
 
