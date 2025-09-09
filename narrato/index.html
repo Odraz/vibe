@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Narrato: Broučkovo ztracené světýlko (s obrázky)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+        }
+        .bg-pastel-yellow { background-color: #FFF9C4; }
+        .bg-pastel-blue { background-color: #B3E5FC; }
+        .bg-pastel-green { background-color: #C8E6C9; }
+        .bg-pastel-pink { background-color: #F8BBD0; }
+        .text-story-default { color: #374151; }
+        .btn-choice:active {
+            transform: scale(0.95);
+        }
+        .image-container { /* Container for the image */
+            margin-bottom: 1rem;
+            display: flex; /* To center image if it's smaller than container */
+            justify-content: center; /* To center image if it's smaller than container */
+            align-items: center; /* To center image if it's smaller than container */
+            width: 100%;
+            min-height: 1px; /* Ensure it collapses if no image */
+        }
+        html, body, #game-container {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .screen {
+            width: 100%;
+            max-width: 600px;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        #choices-container::-webkit-scrollbar { width: 8px; }
+        #choices-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        #choices-container::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        #choices-container::-webkit-scrollbar-thumb:hover { background: #555; }
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-pastel-yellow text-story-default">
+
+    <div id="game-container" class="flex flex-col items-center justify-center min-h-screen p-4">
+
+        <div id="loading-screen" class="text-center screen">
+            <h1 class="text-2xl font-bold mb-4">Načítání hry...</h1>
+            <div class="loader"></div>
+            <p id="loading-error" class="text-red-500 mt-4 hidden"></p>
+        </div>
+
+        <div id="intro-screen" class="text-center screen hidden">
+            <h1 id="story-title-display" class="text-3xl md:text-4xl font-bold mb-8"></h1>
+            <div class="image-container mb-6" id="intro-image-container">
+                 </div>
+            <button id="start-button" class="bg-pastel-pink hover:bg-pink-400 text-xl font-bold py-3 px-8 rounded-lg shadow-md btn-choice">
+                Hrát ▶️
+            </button>
+        </div>
+
+        <div id="story-screen" class="flex flex-col items-center text-center screen hidden">
+            <div id="image-container-story" class="image-container mb-4">
+                </div>
+            <div class="relative w-full mb-4">
+                <p id="text-display" class="text-lg md:text-xl leading-relaxed mb-2 bg-white/70 p-4 rounded-lg shadow"></p>
+            </div>
+            <div id="choices-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-h-[40vh] sm:max-h-none overflow-y-auto">
+                </div>
+        </div>
+
+        <div id="end-screen" class="text-center screen hidden">
+            <div id="image-container-end" class="image-container mb-4">
+                 </div>
+            <p id="end-text-display" class="text-xl md:text-2xl font-bold mb-8 bg-white/70 p-4 rounded-lg shadow"></p>
+            <button id="play-again-button" class="bg-pastel-green hover:bg-green-400 text-xl font-bold py-3 px-8 rounded-lg shadow-md btn-choice">
+                Hrát znovu
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Herní elementy
+        const loadingScreen = document.getElementById('loading-screen');
+        const loadingErrorText = document.getElementById('loading-error');
+        const introScreen = document.getElementById('intro-screen');
+        const storyTitleDisplay = document.getElementById('story-title-display');
+        const introImageContainer = document.getElementById('intro-image-container');
+        const startButton = document.getElementById('start-button');
+        const storyScreen = document.getElementById('story-screen');
+        const imageContainerStory = document.getElementById('image-container-story');
+        const textDisplay = document.getElementById('text-display');
+        const choicesContainer = document.getElementById('choices-container');
+        const endScreen = document.getElementById('end-screen');
+        const imageContainerEnd = document.getElementById('image-container-end');
+        const endTextDisplay = document.getElementById('end-text-display');
+        const playAgainButton = document.getElementById('play-again-button');
+
+        // Herní data a stav
+        let storyData = null;
+        let currentNodeId = null;
+
+        // Funkce pro zobrazení obrázku
+        function displayImage(nodeId, containerElement) {
+            containerElement.innerHTML = ''; // Vyčistit předchozí obrázek
+            const img = document.createElement('img');
+            img.src = `images/${nodeId}.jpg`; // Cesta k obrázku
+            img.alt = `Obrázek pro scénu ${nodeId}`; // Alt text
+            // Tailwind třídy pro responzivní obrázek s omezenou výškou
+            img.className = 'w-full h-auto rounded-lg object-contain max-h-60 md:max-h-80 mx-auto shadow-md';
+
+            img.onload = () => {
+                containerElement.appendChild(img); // Přidat obrázek, jen pokud se úspěšně načte
+            };
+            img.onerror = () => {
+                containerElement.innerHTML = ''; // Pokud se obrázek nenačte, nechat kontejner prázdný
+                // console.warn(`Obrázek images/${nodeId}.jpg nenalezen.`);
+            };
+        }
+
+        // Zobrazení obrazovky
+        function showScreen(screenElement) {
+            introScreen.classList.add('hidden');
+            storyScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            loadingScreen.classList.add('hidden');
+            screenElement.classList.remove('hidden');
+        }
+
+        // Vykreslení uzlu příběhu
+        function renderNode(nodeId) {
+            const node = storyData.nodes[nodeId];
+            if (!node) {
+                loadingErrorText.textContent = `Chyba: Uzel ${nodeId} nenalezen. Zkontrolujte soubor broucci.json.`;
+                loadingErrorText.classList.remove('hidden');
+                showScreen(loadingScreen);
+                return;
+            }
+
+            textDisplay.textContent = node.text_prompt;
+            displayImage(node.node_id, imageContainerStory); // Zobrazit obrázek pro aktuální uzel
+
+            if (node.is_ending) {
+                showEndScreen(node);
+            } else {
+                choicesContainer.innerHTML = ''; // Vyčistit předchozí volby
+                if (node.choices && node.choices.length > 0) {
+                    node.choices.forEach(choice => {
+                        const button = document.createElement('button');
+                        button.textContent = choice.choice_text;
+                        button.className = 'bg-pastel-blue hover:bg-blue-400 text-story-default font-semibold py-3 px-4 rounded-lg shadow-md w-full text-left flex items-center justify-center btn-choice';
+                        button.onclick = () => handleChoice(choice.next_node_id);
+                        choicesContainer.appendChild(button);
+                    });
+                }
+                showScreen(storyScreen);
+            }
+        }
+
+        // Zpracování volby hráče
+        function handleChoice(nextNodeId) {
+            currentNodeId = nextNodeId;
+            renderNode(currentNodeId);
+        }
+
+        // Zobrazení koncové obrazovky
+        function showEndScreen(node) {
+            endTextDisplay.textContent = node.text_prompt;
+            displayImage(node.node_id, imageContainerEnd); // Zobrazit obrázek pro koncový uzel
+            showScreen(endScreen);
+        }
+
+        // Začátek hry
+        async function startGame() {
+            if (!storyData) {
+                loadingErrorText.textContent = "Chyba: Data příběhu nejsou načtena. Zkuste obnovit stránku.";
+                loadingErrorText.classList.remove('hidden');
+                showScreen(loadingScreen);
+                return;
+            }
+            storyTitleDisplay.textContent = storyData.storyTitle || "Dobrodružství Broučka";
+            currentNodeId = storyData.startNode;
+
+            // Zobrazit obrázek pro úvodní obrazovku, pokud startNode existuje
+            if (storyData.nodes[currentNodeId]) {
+                 displayImage(currentNodeId, introImageContainer);
+            } else {
+                introImageContainer.innerHTML = ''; // Vyčistit, pokud startNode nemá obrázek nebo neexistuje
+            }
+
+
+            if (!storyData.nodes[currentNodeId]) {
+                loadingErrorText.textContent = `Chyba: Startovací uzel '${storyData.startNode}' nenalezen. Zkontrolujte soubor broucci.json.`;
+                loadingErrorText.classList.remove('hidden');
+                showScreen(loadingScreen); // Zůstat na načítací obrazovce s chybou
+                return; // Nezačínat hru, pokud startovací uzel není validní
+            }
+            // Po kliknutí na "Hrát" přejít rovnou na první scénu příběhu
+            renderNode(currentNodeId);
+        }
+        
+        // Hrát znovu
+        function playAgain() {
+             // Při "Hrát znovu" se vrátíme na úvodní obrazovku, která znovu načte startNode obrázek
+            if (storyData && storyData.startNode && storyData.nodes[storyData.startNode]) {
+                displayImage(storyData.startNode, introImageContainer);
+            } else {
+                introImageContainer.innerHTML = '';
+            }
+            showScreen(introScreen);
+        }
+
+        // Inicializace hry
+        async function initGame() {
+            showScreen(loadingScreen);
+            loadingErrorText.classList.add('hidden');
+
+            try {
+                const response = await fetch('broucci.json');
+                if (!response.ok) {
+                    throw new Error(`Chyba načítání souboru: ${response.status} ${response.statusText}`);
+                }
+                storyData = await response.json();
+                if (storyData && storyData.storyTitle && storyData.startNode && storyData.nodes) {
+                    storyTitleDisplay.textContent = storyData.storyTitle;
+                     // Zobrazit obrázek pro úvodní obrazovku hned po načtení JSONu
+                    if (storyData.nodes[storyData.startNode]) {
+                        displayImage(storyData.startNode, introImageContainer);
+                    } else {
+                        introImageContainer.innerHTML = ''; // Vyčistit, pokud startNode nemá obrázek nebo neexistuje
+                        // console.warn(`Startovací uzel ${storyData.startNode} nemá obrázek nebo neexistuje v datech.`);
+                    }
+                    showScreen(introScreen);
+                } else {
+                    throw new Error("JSON soubor nemá správnou strukturu.");
+                }
+            } catch (error) {
+                loadingErrorText.textContent = `Nepodařilo se načíst příběh: ${error.message}. Ujistěte se, že soubor "broucci.json" je ve stejné složce jako hra a má správný formát.`;
+                loadingErrorText.classList.remove('hidden');
+                showScreen(loadingScreen);
+            }
+        }
+
+        // Event Listeners
+        startButton.addEventListener('click', startGame);
+        playAgainButton.addEventListener('click', playAgain);
+
+        // Spustit inicializaci hry po načtení stránky
+        window.onload = initGame;
+
+    </script>
+
+</body>
+</html>

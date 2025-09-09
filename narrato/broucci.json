@@ -1,0 +1,870 @@
+{
+  "storyTitle": "Broučkovo ztracené světýlko",
+  "startNode": "Q1",
+  "nodes": {
+    "Q1": {
+      "node_id": "Q1",
+      "text_prompt": "Brouček si dneska krásně svítí svým novým světýlkem. Kam si s ním půjde hrát?",
+      "image_suggestion": "Brouček drží své rozsvícené světýlko, je zvědavý, v pozadí louka.",
+      "choices": [
+        {
+          "choice_text": "Ke kytičce.",
+          "choice_image_suggestion": "Velký barevný květ (např. červený mák nebo modrý zvonek).",
+          "next_node_id": "Q2A"
+        },
+        {
+          "choice_text": "K potůčku.",
+          "choice_image_suggestion": "Malý potůček s průzračnou vodou a kamínky.",
+          "next_node_id": "Q2B"
+        },
+        {
+          "choice_text": "Za kamarády.",
+          "choice_image_suggestion": "Brouček, Beruška a Komtříček si hrají na paloučku.",
+          "next_node_id": "Q2C"
+        }
+      ]
+    },
+    "Q2A": {
+      "node_id": "Q2A",
+      "text_prompt": "U kytičky to tak krásně voní! Ale najednou – bác! Brouček zakopl o kořínek a světýlko mu upadlo a zhaslo! Co teď Brouček udělá?",
+      "image_suggestion": "Brouček u kytky, překvapený, světýlko leží na zemi zhasnuté.",
+      "choices": [
+        {
+          "choice_text": "Zkusí rozsvítit.",
+          "choice_image_suggestion": "Brouček tře světýlko mezi prstíky.",
+          "next_node_id": "Q3A"
+        },
+        {
+          "choice_text": "Zavolá Maminku.",
+          "choice_image_suggestion": "Brouček volá, Maminka v dálce na louce.",
+          "next_node_id": "Q3B_MOM_HELPS"
+        },
+        {
+          "choice_text": "Hledá mušku.",
+          "choice_image_suggestion": "Brouček se rozhlíží, v náznaku malá svatojánská muška.",
+          "next_node_id": "Q3C_FIREFLY"
+        }
+      ]
+    },
+    "Q2B": {
+      "node_id": "Q2B",
+      "text_prompt": "Potůček tak vesele bublá! Brouček si chtěl světýlkem posvítit na kamínky na dně, ale žbluňk! Světýlko mu sklouzlo do vody! Co teď Brouček udělá?",
+      "image_suggestion": "Broučkovo světýlko padá do potůčku, Brouček překvapeně kouká.",
+      "choices": [
+        {
+          "choice_text": "Zkusí vylovit.",
+          "choice_image_suggestion": "Brouček se stéblem trávy snaží dosáhnout na světýlko v potoce.",
+          "next_node_id": "Q3D"
+        },
+        {
+          "choice_text": "Běží pro Tatínka.",
+          "choice_image_suggestion": "Brouček běží, v dálce Tatínek u plůtku.",
+          "next_node_id": "Q3E_DAD_HELPS"
+        },
+        {
+          "choice_text": "Hledá Berušku.",
+          "choice_image_suggestion": "Brouček se rozhlíží, v náznaku Beruška.",
+          "next_node_id": "Q3F_BERUSKA_HELPS"
+        }
+      ]
+    },
+    "Q2C": {
+      "node_id": "Q2C",
+      "text_prompt": "Na mýtince je s Beruškou a Komtříčkem velká zábava! Hrají na honěnou a Brouček najednou zjistí, že své světýlko nikde nevidí! Asi ho někde ztratil. Co Brouček udělá?",
+      "image_suggestion": "Brouček hledá, Beruška a Komtříček si hrají opodál, světýlko není vidět.",
+      "choices": [
+        {
+          "choice_text": "Zeptá se Berušky.",
+          "choice_image_suggestion": "Brouček mluví s Beruškou.",
+          "next_node_id": "Q3F_BERUSKA_HELPS"
+        },
+        {
+          "choice_text": "Zeptá se Komtříčka.",
+          "choice_image_suggestion": "Brouček mluví s Komtříčkem.",
+          "next_node_id": "Q3G_KOMTRICEK_HELPS"
+        },
+        {
+          "choice_text": "Hledá sám.",
+          "choice_image_suggestion": "Brouček prohledává trávu.",
+          "next_node_id": "Q3H"
+        }
+      ]
+    },
+    "Q3A": {
+      "node_id": "Q3A",
+      "text_prompt": "Brouček tře světýlko, jak nejvíc umí, ale ne a ne se rozsvítit. Je už skoro celé ošoupané. Co udělá dál?",
+      "image_suggestion": "Brouček smutně kouká na zhasnuté světýlko v ruce.",
+      "choices": [
+        {
+          "choice_text": "Jde za Maminkou.",
+          "choice_image_suggestion": "Brouček jde směrem k Mamince.",
+          "next_node_id": "Q3B_MOM_HELPS"
+        },
+        {
+          "choice_text": "Hledá Komtříčka.",
+          "choice_image_suggestion": "Brouček se rozhlíží po Komtříčkovi.",
+          "next_node_id": "Q3G_KOMTRICEK_HELPS" 
+        },
+        {
+          "choice_text": "Je moc smutný.",
+          "choice_image_suggestion": "Brouček sedí smutně pod kytkou.",
+          "next_node_id": "Q4A_SAD_BROUCEK_ZLUNA_APPROACHES"
+        }
+      ]
+    },
+    "Q3B_MOM_HELPS": {
+      "node_id": "Q3B_MOM_HELPS",
+      "text_prompt": "Maminka přiletěla k Broučkovi. 'Copak se stalo, můj malý Broučku?' ptá se starostlivě.",
+      "image_suggestion": "Maminka je u Broučka, kouká na něj s láskou.",
+      "choices": [
+        {
+          "choice_text": "Světýlko zhaslo!",
+          "choice_image_suggestion": "Brouček ukazuje Mamince zhasnuté světýlko.",
+          "next_node_id": "Q4B_MOM_FIXES_OR_NEW"
+        },
+        {
+          "choice_text": "Bojím se tmy!",
+          "choice_image_suggestion": "Brouček se trochu bojí, drží se Maminky.",
+          "next_node_id": "Q4C_MOM_COMFORTS"
+        },
+        {
+          "choice_text": "Ukáže na světýlko.",
+          "choice_image_suggestion": "Brouček se slzami v očích ukazuje na světýlko.",
+          "next_node_id": "Q4B_MOM_FIXES_OR_NEW"
+        }
+      ]
+    },
+    "Q3C_FIREFLY": {
+      "node_id": "Q3C_FIREFLY",
+      "text_prompt": "Brouček se rozhlíží a v dálce vidí malé světýlko! Letí blíž a je to svatojánská muška! Co jí Brouček řekne?",
+      "image_suggestion": "Brouček letí k malé svítící svatojánské mušce.",
+      "choices": [
+        {
+          "choice_text": "Posvítíš mi domů?",
+          "choice_image_suggestion": "Brouček prosí mušku, v pozadí náznak domečku.",
+          "next_node_id": "Q4D_FIREFLY_LEADS_HOME"
+        },
+        {
+          "choice_text": "Pomůžeš opravit?",
+          "choice_image_suggestion": "Brouček ukazuje mušce své zhasnuté světýlko.",
+          "next_node_id": "Q4E_FIREFLY_HELPS_LANTERN"
+        },
+        {
+          "choice_text": "Budeme si hrát?",
+          "choice_image_suggestion": "Brouček a muška, oba svítí (Broučkovo jen náznakem).",
+          "next_node_id": "Q4F_FIREFLY_PLAYS"
+        }
+      ]
+    },
+    "Q3D": {
+      "node_id": "Q3D",
+      "text_prompt": "Brouček se opatrně nahýbá nad vodu a snaží se světýlko zachytit stéblem. Ale stéblo je moc krátké a světýlko se posunulo dál! Co teď?",
+      "image_suggestion": "Brouček se stéblem nedosáhne na světýlko v potoce, světýlko je dál.",
+      "choices": [
+        {
+          "choice_text": "Najít klacík.",
+          "choice_image_suggestion": "Brouček hledá klacík u břehu.",
+          "next_node_id": "Q4G_TRY_STICK"
+        },
+        {
+          "choice_text": "Zavolat Tatínka.",
+          "choice_image_suggestion": "Brouček volá směrem k Tatínkovi (v dálce).",
+          "next_node_id": "Q3E_DAD_HELPS"
+        },
+        {
+          "choice_text": "Je smutný u vody.",
+          "choice_image_suggestion": "Brouček sedí smutně u potoka, kouká na světýlko.",
+          "next_node_id": "Q4A_SAD_BROUCEK_ZLUNA_APPROACHES"
+        }
+      ]
+    },
+     "Q3E_DAD_HELPS": {
+      "node_id": "Q3E_DAD_HELPS",
+      "text_prompt": "Tatínek přispěchal. 'Co se děje, Broučku? Potřebuješ pomoct?' ptá se svým hlubokým hlasem.",
+      "image_suggestion": "Tatínek je u Broučka, vypadá starostlivě a silně.",
+      "choices": [
+        {
+          "choice_text": "Světýlko je v potoce!",
+          "choice_image_suggestion": "Brouček ukazuje Tatínkovi na světýlko v potoce.",
+          "next_node_id": "Q4H_DAD_RETRIEVES_OR_NEW"
+        },
+        {
+          "choice_text": "Bojím se o něj!",
+          "choice_image_suggestion": "Brouček se trochu bojí, drží se Tatínka.",
+          "next_node_id": "Q4I_DAD_COMFORTS"
+        },
+        {
+          "choice_text": "Ukáže na potok.",
+          "choice_image_suggestion": "Brouček mlčky ukazuje na světýlko v potoce.",
+          "next_node_id": "Q4H_DAD_RETRIEVES_OR_NEW"
+        }
+      ]
+    },
+    "Q3F_BERUSKA_HELPS": {
+      "node_id": "Q3F_BERUSKA_HELPS",
+      "text_prompt": "Brouček našel Berušku. 'Beruško, mám problém!' (Nebo z Q2C: 'Beruško, neviděla jsi světýlko?').",
+      "image_suggestion": "Brouček mluví s Beruškou, Beruška pozorně poslouchá.",
+      "choices": [
+        {
+          "choice_text": "Pomůžeš hledat?",
+          "choice_image_suggestion": "Brouček a Beruška se dívají směrem k místu problému (tráva/potok).",
+          "next_node_id": "Q4J_BERUSKA_SEARCH_RETRIEVE"
+        },
+        {
+          "choice_text": "Co teď budeme dělat?",
+          "choice_image_suggestion": "Brouček vypadá ztraceně, Beruška se zamýšlí.",
+          "next_node_id": "Q4K_BERUSKA_ALTERNATIVE_FUN"
+        },
+        {
+          "choice_text": "Pojď si hrát!",
+          "choice_image_suggestion": "Brouček táhne Berušku za ruku hrát si.",
+          "next_node_id": "Q4L_PLAY_WITH_BERUSKA_DISTRACTION"
+        }
+      ]
+    },
+    "Q3G_KOMTRICEK_HELPS": {
+      "node_id": "Q3G_KOMTRICEK_HELPS",
+      "text_prompt": "Brouček našel Komtříčka. 'Komtříčku, pomůžeš mi?' (Nebo z Q2C: 'Komtříčku, neviděl jsi světýlko?').",
+      "image_suggestion": "Brouček mluví s Komtříčkem, Komtříček je zvědavý.",
+      "choices": [
+        {
+          "choice_text": "Neviděl jsi světýlko?",
+          "choice_image_suggestion": "Komtříček ukazuje někam do trávy.",
+          "next_node_id": "Q4M_KOMTRICEK_FINDS_LOCATION"
+        },
+        {
+          "choice_text": "Pojď hledat se mnou!",
+          "choice_image_suggestion": "Komtříček a Brouček jdou spolu hledat.",
+          "next_node_id": "Q4N_SEARCH_WITH_KOMTRICEK"
+        },
+        {
+          "choice_text": "Vyrobíme nové?",
+          "choice_image_suggestion": "Komtříček drží kousek kůry a usmívá se.",
+          "next_node_id": "Q4O_MAKE_NEW_WITH_KOMTRICEK"
+        }
+      ]
+    },
+    "Q3H": {
+      "node_id": "Q3H",
+      "text_prompt": "Brouček pečlivě prohledává každý lísteček a stéblo trávy. Ale světýlko nikde. Začíná být trochu unavený. Co udělá?",
+      "image_suggestion": "Unavený Brouček sedí v trávě po marném hledání.",
+      "choices": [
+        {
+          "choice_text": "Zavolá rodiče.",
+          "choice_image_suggestion": "Brouček volá, v dálce siluety rodičů.",
+          "next_node_id": "Q4P_PARENTS_SEARCH"
+        },
+        {
+          "choice_text": "Poprosí Berušku.",
+          "choice_image_suggestion": "Brouček jde k Berušce, která si hraje.",
+          "next_node_id": "Q4J_BERUSKA_SEARCH_RETRIEVE" 
+        },
+        {
+          "choice_text": "Odpočine si.",
+          "choice_image_suggestion": "Brouček odpočívá v kalichu velkého květu.",
+          "next_node_id": "Q4A_SAD_BROUCEK_ZLUNA_APPROACHES" 
+        }
+      ]
+    },
+    "Q4A_SAD_BROUCEK_ZLUNA_APPROACHES": {
+      "node_id": "Q4A_SAD_BROUCEK_ZLUNA_APPROACHES",
+      "text_prompt": "Brouček sedí smutný. Najednou uslyší šustot křídel! Nad ním krouží veliká Žluna a mlsně si ho prohlíží. 'Kdopak se nám to tu schovává, malý, tučný broučku?' zavrčí Žluna.",
+      "image_suggestion": "Brouček sedí smutně/unaveně, nad ním krouží hrozivá Žluna s mlsným výrazem.",
+      "choices": [
+        {
+          "choice_text": "Rychle uletět!",
+          "choice_image_suggestion": "Brouček se snaží rychle uletět pryč.",
+          "next_node_id": "Q5_ZLUNA_ESCAPE_FLY"
+        },
+        {
+          "choice_text": "Schovat se pod list!",
+          "choice_image_suggestion": "Brouček se krčí pod velkým listem.",
+          "next_node_id": "Q5_ZLUNA_ESCAPE_HIDE"
+        },
+        {
+          "choice_text": "Dělat mrtvého!",
+          "choice_image_suggestion": "Brouček leží nehybně na zemi.",
+          "next_node_id": "Q5_ZLUNA_ESCAPE_PLAYDEAD"
+        }
+      ]
+    },
+    "Q4B_MOM_FIXES_OR_NEW": {
+      "node_id": "Q4B_MOM_FIXES_OR_NEW",
+      "text_prompt": "Maminka vzala světýlko do dlaní. 'Neboj, Broučku, podíváme se na to spolu.'",
+      "image_suggestion": "Maminka drží Broučkovo světýlko, Brouček zvědavě kouká.",
+      "choices": [
+        {
+          "choice_text": "Opraví ho Maminka?",
+          "choice_image_suggestion": "Maminka něco dělá se světýlkem, to začíná svítit.",
+          "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+        },
+        {
+          "choice_text": "Dostanu nové?",
+          "choice_image_suggestion": "Maminka ukazuje na zhasnuté světýlko, pak na domeček.",
+          "next_node_id": "END_NEW_LANTERN_HAPPY"
+        },
+        {
+          "choice_text": "Půjdeme domů?",
+          "choice_image_suggestion": "Maminka objímá Broučka, oba se usmívají.",
+          "next_node_id": "END_HOME_SAFE_WITH_FAMILY"
+        }
+      ]
+    },
+    "Q4C_MOM_COMFORTS": {
+      "node_id": "Q4C_MOM_COMFORTS",
+      "text_prompt": "Maminka Broučka pohladí. 'Tmy se nemusíš bát, když jsem tu já. Co by ti teď udělalo radost?'",
+      "image_suggestion": "Maminka hladí Broučka po hlavě, Brouček se usmívá.",
+      "choices": [
+        {
+          "choice_text": "Najít světýlko.",
+          "choice_image_suggestion": "Brouček ukazuje na místo, kde světýlko ztratil/zhaslo.",
+          "next_node_id": "Q4B_MOM_FIXES_OR_NEW" 
+        },
+        {
+          "choice_text": "Jít domů.",
+          "choice_image_suggestion": "Brouček ukazuje směrem k domečku.",
+          "next_node_id": "END_HOME_SAFE_WITH_FAMILY"
+        },
+        {
+          "choice_text": "Písničku!",
+          "choice_image_suggestion": "Brouček s rozzářenýma očima, kolem noty.",
+          "next_node_id": "END_HOME_AFTER_SHARED_ACTIVITY_SONG"
+        }
+      ]
+    },
+    "Q4D_FIREFLY_LEADS_HOME": {
+        "node_id": "Q4D_FIREFLY_LEADS_HOME",
+        "text_prompt": "Svatojánská muška se usměje: 'Jasně, Broučku, pojď za mnou!' Kam Broučka zavede?",
+        "image_suggestion": "Svatojánská muška letí vpřed, Brouček ji následuje.",
+        "choices": [
+            {
+                "choice_text": "K domečku.",
+                "choice_image_suggestion": "Broučkův domeček, Maminka ve dveřích, muška a Brouček přilétají.",
+                "next_node_id": "END_HOME_SAFE_WITH_FAMILY"
+            },
+            {
+                "choice_text": "Na mýtinku.",
+                "choice_image_suggestion": "Mýtinka plná svítících broučků a svatojánských mušek.",
+                "next_node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY"
+            },
+            {
+                "choice_text": "K velké světlušce.",
+                "choice_image_suggestion": "Velká světluška (laskavá) a Brouček s muškou.",
+                "next_node_id": "Q5_GLOWWORM_FIXES"
+            }
+        ]
+    },
+    "Q4E_FIREFLY_HELPS_LANTERN": {
+        "node_id": "Q4E_FIREFLY_HELPS_LANTERN",
+        "text_prompt": "Svatojánská muška si prohlédne Broučkovo světýlko. 'Hmm, zkusíme tohle!' Co muška udělá?",
+        "image_suggestion": "Svatojánská muška si prohlíží Broučkovo zhasnuté světýlko.",
+        "choices": [
+            {
+                "choice_text": "Foukne do něj.",
+                "choice_image_suggestion": "Muška fouká do světýlka, to se rozsvěcí.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Najde kapku rosy.",
+                "choice_image_suggestion": "Muška dává na světýlko třpytivou kapičku rosy.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Zná velkou světlušku.",
+                "choice_image_suggestion": "Muška ukazuje směrem k velké světlušce v dálce.",
+                "next_node_id": "Q5_GLOWWORM_FIXES"
+            }
+        ]
+    },
+     "Q4F_FIREFLY_PLAYS": {
+        "node_id": "Q4F_FIREFLY_PLAYS",
+        "text_prompt": "Brouček a svatojánská muška si spolu hrají a jejich světýlka tančí ve tmě. Co udělají dál?",
+        "image_suggestion": "Broučkovo (slabě) a muščino světýlko tančí.",
+        "choices": [
+            {
+                "choice_text": "Světelná show!",
+                "choice_image_suggestion": "Více svatojánských mušek tančí a svítí.",
+                "next_node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY"
+            },
+            {
+                "choice_text": "Dá mu světlo.",
+                "choice_image_suggestion": "Muška se dotýká svým světlem Broučkova světýlka, to se rozsvítí.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Rozloučí se.",
+                "choice_image_suggestion": "Brouček mává mušce a jde k domečku.",
+                "next_node_id": "END_HOME_SAFE_WITH_FAMILY"
+            }
+        ]
+    },
+    "Q4G_TRY_STICK": {
+        "node_id": "Q4G_TRY_STICK",
+        "text_prompt": "Brouček našel pevný klacík. Opatrně se snaží světýlko přitáhnout ke břehu. Podaří se mu to?",
+        "image_suggestion": "Brouček s klacíkem se snaží dosáhnout na světýlko v potoce.",
+        "choices": [
+            {
+                "choice_text": "Ano, je venku!",
+                "choice_image_suggestion": "Brouček drží mokré světýlko vylovené z vody.",
+                "next_node_id": "Q5_WET_LANTERN_OPTIONS"
+            },
+            {
+                "choice_text": "Ne, je dál.",
+                "choice_image_suggestion": "Světýlko je dál v potoce, Brouček je smutný.",
+                "next_node_id": "Q4A_SAD_BROUCEK_ZLUNA_APPROACHES"
+            },
+            {
+                "choice_text": "Klacík se zlomil!",
+                "choice_image_suggestion": "Zlomený klacík v Broučkově ruce, Brouček překvapený.",
+                "next_node_id": "Q4A_SAD_BROUCEK_ZLUNA_APPROACHES"
+            }
+        ]
+    },
+    "Q4H_DAD_RETRIEVES_OR_NEW": {
+        "node_id": "Q4H_DAD_RETRIEVES_OR_NEW",
+        "text_prompt": "Tatínek se podívá na světýlko v potoce. 'Neboj se, Broučku, něco vymyslíme!' Jak Tatínek pomůže?",
+        "image_suggestion": "Tatínek si prohlíží světýlko v potoce, Brouček čeká.",
+        "choices": [
+            {
+                "choice_text": "Tatínek vleze do vody.",
+                "choice_image_suggestion": "Tatínek v potoce podává Broučkovi světýlko.",
+                "next_node_id": "Q5_WET_LANTERN_OPTIONS"
+            },
+            {
+                "choice_text": "Lodička z listu.",
+                "choice_image_suggestion": "Světýlko pluje na lístku k Broučkovi, Tatínek pomáhá.",
+                "next_node_id": "Q5_WET_LANTERN_OPTIONS"
+            },
+            {
+                "choice_text": "Nové světýlko doma?",
+                "choice_image_suggestion": "Tatínek ukazuje na mokré světýlko, pak na domeček s úsměvem.",
+                "next_node_id": "END_NEW_LANTERN_HAPPY"
+            }
+        ]
+    },
+    "Q4I_DAD_COMFORTS": {
+        "node_id": "Q4I_DAD_COMFORTS",
+        "text_prompt": "Tatínek Broučka obejme. 'Světýlka jsou jen věci, Broučku. Hlavní je, že jsi v pořádku! Co bys chtěl teď dělat?'",
+        "image_suggestion": "Tatínek objímá Broučka, oba se usmívají.",
+        "choices": [
+            {
+                "choice_text": "Zkusit ho vyndat.",
+                "choice_image_suggestion": "Brouček ukazuje na potok, kde je světýlko.",
+                "next_node_id": "Q4H_DAD_RETRIEVES_OR_NEW"
+            },
+            {
+                "choice_text": "Jít domů.",
+                "choice_image_suggestion": "Brouček ukazuje směrem k domečku.",
+                "next_node_id": "END_HOME_SAFE_WITH_FAMILY"
+            },
+            {
+                "choice_text": "Vyprávět pohádku.",
+                "choice_image_suggestion": "Brouček s rozzářenýma očima, kolem Tatínka kniha/náznak pohádky.",
+                "next_node_id": "END_HOME_AFTER_SHARED_ACTIVITY_STORY"
+            }
+        ]
+    },
+    "Q4J_BERUSKA_SEARCH_RETRIEVE": {
+        "node_id": "Q4J_BERUSKA_SEARCH_RETRIEVE",
+        "text_prompt": "Beruška se hned pustí do pomoci. 'Kde jsi ho viděl/a naposledy?' Jak Broučkovi pomůže?",
+        "image_suggestion": "Beruška a Brouček spolu něco hledají / Beruška pomáhá u potoka.",
+        "choices": [
+            {
+                "choice_text": "Beruška ho najde!",
+                "choice_image_suggestion": "Beruška ukazuje na nalezené/vylovené světýlko.",
+                "next_node_id": "Q5_LANTERN_FOUND_OPTIONS"
+            },
+            {
+                "choice_text": "Společně ho objeví!",
+                "choice_image_suggestion": "Brouček a Beruška radostně drží nalezené světýlko.",
+                "next_node_id": "Q5_LANTERN_FOUND_OPTIONS"
+            },
+            {
+                "choice_text": "Budeme si hrát!",
+                "choice_image_suggestion": "Beruška a Brouček si spolu vesele hrají.",
+                "next_node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY"
+            }
+        ]
+    },
+    "Q4K_BERUSKA_ALTERNATIVE_FUN": {
+        "node_id": "Q4K_BERUSKA_ALTERNATIVE_FUN",
+        "text_prompt": "Beruška se usměje: 'Nevadí, že světýlko teď není. Můžeme si hrát na něco jiného!' Co budou Brouček s Beruškou dělat?",
+        "image_suggestion": "Beruška a Brouček se usmívají a chystají si hrát.",
+        "choices": [
+            {
+                "choice_text": "Hrát na honěnou.",
+                "choice_image_suggestion": "Brouček a Beruška běhají mezi kytkami.",
+                "next_node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY"
+            },
+            {
+                "choice_text": "Stavět domeček.",
+                "choice_image_suggestion": "Brouček a Beruška staví malý domeček.",
+                "next_node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY"
+            },
+            {
+                "choice_text": "Na motýly.",
+                "choice_image_suggestion": "Brouček a Beruška pozorují letící motýly.",
+                "next_node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY"
+            }
+        ]
+    },
+    "Q4L_PLAY_WITH_BERUSKA_DISTRACTION": {
+        "node_id": "Q4L_PLAY_WITH_BERUSKA_DISTRACTION",
+        "text_prompt": "Brouček a Beruška si hrají a je jim spolu moc dobře. Na ztracené světýlko Brouček skoro zapomněl. Co se stane dál?",
+        "image_suggestion": "Brouček a Beruška si vesele hrají na louce.",
+        "choices": [
+            {
+                "choice_text": "Najdou světýlko!",
+                "choice_image_suggestion": "Brouček nebo Beruška ukazuje na náhodně nalezené světýlko.",
+                "next_node_id": "Q5_LANTERN_FOUND_OPTIONS"
+            },
+            {
+                "choice_text": "Maminka volá.",
+                "choice_image_suggestion": "Maminka v dálce mává, slunce zapadá.",
+                "next_node_id": "END_HOME_SAFE_WITH_FAMILY"
+            },
+            {
+                "choice_text": "Začíná pršet!",
+                "choice_image_suggestion": "Kapky deště, Brouček a Beruška běží pod list.",
+                "next_node_id": "END_HOME_AFTER_SHARED_ACTIVITY_RAIN"
+            }
+        ]
+    },
+    "Q4M_KOMTRICEK_FINDS_LOCATION": {
+        "node_id": "Q4M_KOMTRICEK_FINDS_LOCATION",
+        "text_prompt": "Komtříček vede Broučka k místu, kde si myslí, že světýlko viděl. A opravdu! Leží tam v trávě! Co udělají?",
+        "image_suggestion": "Komtříček ukazuje Broučkovi na světýlko ležící v trávě.",
+        "choices": [
+            {
+                "choice_text": "Zvedne ho Brouček.",
+                "choice_image_suggestion": "Brouček drží světýlko, které svítí, Komtříček se raduje.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Pomůže Komtříček.",
+                "choice_image_suggestion": "Komtříček pomáhá Broučkovi narovnat světýlko.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Oslaví to tancem.",
+                "choice_image_suggestion": "Brouček a Komtříček tančí kolem svítícího světýlka.",
+                "next_node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY"
+            }
+        ]
+    },
+    "Q4N_SEARCH_WITH_KOMTRICEK": {
+        "node_id": "Q4N_SEARCH_WITH_KOMTRICEK",
+        "text_prompt": "Komtříček a Brouček spolu hledají Broučkovo světýlko. Jak jejich dobrodružství pokračuje?",
+        "image_suggestion": "Brouček a Komtříček pátrají v trávě.",
+        "choices": [
+            {
+                "choice_text": "Najdou ho!",
+                "choice_image_suggestion": "Brouček a Komtříček se radují nad nalezeným světýlkem.",
+                "next_node_id": "Q5_LANTERN_FOUND_OPTIONS"
+            },
+            {
+                "choice_text": "Komtříček půjčí své.",
+                "choice_image_suggestion": "Komtříček dává své světýlko Broučkovi.",
+                "next_node_id": "END_HOME_AFTER_SHARED_ACTIVITY_BORROWED_LIGHT"
+            },
+            {
+                "choice_text": "Budou si hrát spolu.",
+                "choice_image_suggestion": "Brouček a Komtříček jdou spolu pod jedním světýlkem.",
+                "next_node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY"
+            }
+        ]
+    },
+    "Q4O_MAKE_NEW_WITH_KOMTRICEK": {
+        "node_id": "Q4O_MAKE_NEW_WITH_KOMTRICEK",
+        "text_prompt": "Brouček s Komtříčkem sbírají kůru, mech a lesklé kamínky. Podaří se jim vyrobit nové světýlko?",
+        "image_suggestion": "Brouček a Komtříček spolu něco vyrábějí z přírodních materiálů.",
+        "choices": [
+            {
+                "choice_text": "Ano, je nádherné!",
+                "choice_image_suggestion": "Brouček a Komtříček drží nové, krásně svítící světýlko.",
+                "next_node_id": "END_NEW_LANTERN_HAPPY"
+            },
+            {
+                "choice_text": "Ano, trochu svítí.",
+                "choice_image_suggestion": "Brouček a Komtříček drží nové světýlko, které jemně svítí.",
+                "next_node_id": "END_NEW_LANTERN_HAPPY"
+            },
+            {
+                "choice_text": "Ne, ale byla zábava.",
+                "choice_image_suggestion": "Brouček a Komtříček se smějí nad nepovedeným výrobkem.",
+                "next_node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY"
+            }
+        ]
+    },
+    "Q4P_PARENTS_SEARCH": {
+        "node_id": "Q4P_PARENTS_SEARCH",
+        "text_prompt": "Maminka s Tatínkem přiletí a Brouček jim všechno poví. 'Neboj se, společně ho najdeme!' Jak hledání dopadne?",
+        "image_suggestion": "Maminka a Tatínek hledají s Broučkem světýlko.",
+        "choices": [
+            {
+                "choice_text": "Tatínek ho najde!",
+                "choice_image_suggestion": "Tatínek svým světlem osvětluje nalezené Broučkovo světýlko.",
+                "next_node_id": "Q5_LANTERN_FOUND_OPTIONS"
+            },
+            {
+                "choice_text": "Maminka ho najde!",
+                "choice_image_suggestion": "Maminka ukazuje na místo, kde leží světýlko.",
+                "next_node_id": "Q5_LANTERN_FOUND_OPTIONS"
+            },
+            {
+                "choice_text": "Nenajdou, dostane nové.",
+                "choice_image_suggestion": "Tatínek nese Broučka na ramenou domů.",
+                "next_node_id": "END_NEW_LANTERN_HAPPY"
+            }
+        ]
+    },
+    "Q5_ZLUNA_ESCAPE_FLY": {
+        "node_id": "Q5_ZLUNA_ESCAPE_FLY",
+        "text_prompt": "Brouček statečně mává křidélky a snaží se Žluně uletět! Žluna je rychlá, ale Brouček je malý a mrštný. Podaří se mu to?",
+        "image_suggestion": "Brouček letí pryč, Žluna ho stíhá v pozadí.",
+        "choices": [
+            {
+                "choice_text": "Uletěl k Mamince!",
+                "choice_image_suggestion": "Brouček přilétá k Mamince, která ho vítá.",
+                "next_node_id": "END_ESCAPED_ZLUNA_TO_MOM"
+            },
+            {
+                "choice_text": "Schoval se v květech!",
+                "choice_image_suggestion": "Brouček je schovaný v hustých květech, Žluna hledá opodál.",
+                "next_node_id": "END_ESCAPED_ZLUNA_HIDING"
+            },
+            {
+                "choice_text": "Žluna ho skoro chytla!",
+                "choice_image_suggestion": "Žluna těsně za Broučkem, Brouček vyděšený.",
+                "next_node_id": "Q6_ZLUNA_CLOSE_CALL"
+            }
+        ]
+    },
+    "Q5_ZLUNA_ESCAPE_HIDE": {
+        "node_id": "Q5_ZLUNA_ESCAPE_HIDE",
+        "text_prompt": "Brouček se bleskově schoval pod nejbližší velký list. Ani nedýchá. Žluna krouží kolem a hledá. Najde ho?",
+        "image_suggestion": "Brouček schovaný pod listem, je vidět jen kousek Žlunina stínu nebo oka.",
+        "choices": [
+            {
+                "choice_text": "Žluna odletěla!",
+                "choice_image_suggestion": "Žluna odlétá pryč, Brouček opatrně vykukuje.",
+                "next_node_id": "END_ESCAPED_ZLUNA_HIDING"
+            },
+            {
+                "choice_text": "List se pohnul!",
+                "choice_image_suggestion": "List se trochu třese, Brouček je vyděšený.",
+                "next_node_id": "Q6_ZLUNA_FINDS_HIDING"
+            },
+            {
+                "choice_text": "Někdo pomohl!",
+                "choice_image_suggestion": "Přilétá Beruška nebo Komtříček a odvádí Žluninu pozornost.",
+                "next_node_id": "END_ESCAPED_ZLUNA_WITH_HELP"
+            }
+        ]
+    },
+    "Q5_ZLUNA_ESCAPE_PLAYDEAD": {
+        "node_id": "Q5_ZLUNA_ESCAPE_PLAYDEAD",
+        "text_prompt": "Brouček se přestal hýbat a dělá mrtvého brouka. Žluna přistála kousek od něj a zkoumavě si ho prohlíží. Uvěří mu to?",
+        "image_suggestion": "Brouček leží nehybně, Žluna se nad ním sklání a prohlíží si ho.",
+        "choices": [
+            {
+                "choice_text": "Žluna ztratila zájem.",
+                "choice_image_suggestion": "Žluna odlétá pryč, Brouček opatrně otevírá očko.",
+                "next_node_id": "END_ESCAPED_ZLUNA_HIDING" 
+            },
+            {
+                "choice_text": "Žluna do něj šťouchla!",
+                "choice_image_suggestion": "Žluna zobákem šťouchá do Broučka.",
+                "next_node_id": "Q6_ZLUNA_CLOSE_CALL"
+            },
+            {
+                "choice_text": "Někdo ji vyplašil!",
+                "choice_image_suggestion": "V dálce se ozve hlas Tatínka nebo Maminky, Žluna se lekne.",
+                "next_node_id": "END_ESCAPED_ZLUNA_WITH_HELP"
+            }
+        ]
+    },
+    "Q6_ZLUNA_CLOSE_CALL": {
+        "node_id": "Q6_ZLUNA_CLOSE_CALL",
+        "text_prompt": "Žluna Broučka skoro měla! Ale v poslední chvíli se stalo něco nečekaného!",
+        "image_suggestion": "Dynamická scéna, Brouček uniká Žluně jen o vlásek.",
+        "choices": [
+            {
+                "choice_text": "Zachránil ho Tatínek!",
+                "choice_image_suggestion": "Tatínek odhání Žlunu, Brouček je v bezpečí.",
+                "next_node_id": "END_ESCAPED_ZLUNA_WITH_HELP"
+            },
+            {
+                "choice_text": "Spadl do kytky!",
+                "choice_image_suggestion": "Brouček padá do měkkého květu, Žluna ho nevidí.",
+                "next_node_id": "END_ESCAPED_ZLUNA_HIDING"
+            },
+            {
+                "choice_text": "Světýlko se rozsvítilo!",
+                "choice_image_suggestion": "Broučkovo světýlko se náhle jasně rozsvítí a oslní Žlunu.",
+                "next_node_id": "END_LANTERN_SCARES_ZLUNA"
+            }
+        ]
+    },
+    "Q6_ZLUNA_FINDS_HIDING": {
+        "node_id": "Q6_ZLUNA_FINDS_HIDING",
+        "text_prompt": "Ach ne! Žluna si všimla, jak se list pohnul, a teď ví, kde Brouček je! Co se stane?",
+        "image_suggestion": "Žluna zvedá list, pod kterým je vyděšený Brouček.",
+         "choices": [
+            {
+                "choice_text": "Přiletěla Maminka!",
+                "choice_image_suggestion": "Maminka odhání Žlunu od Broučka.",
+                "next_node_id": "END_ESCAPED_ZLUNA_WITH_HELP"
+            },
+            {
+                "choice_text": "Brouček proklouzl!",
+                "choice_image_suggestion": "Brouček rychle proklouzne pod Žlunou a uteče.",
+                "next_node_id": "END_ESCAPED_ZLUNA_HIDING" 
+            },
+            {
+                "choice_text": "Hlasitě vykřikl!",
+                "choice_image_suggestion": "Brouček křičí, Žluna se na chvilku zarazí.",
+                "next_node_id": "Q6_ZLUNA_CLOSE_CALL" 
+            }
+        ]
+    },
+    "Q5_GLOWWORM_FIXES": {
+        "node_id": "Q5_GLOWWORM_FIXES",
+        "text_prompt": "Velká moudrá světluška si Broučkovo světýlko prohlédne. 'To spravíme!' řekne laskavě. Co udělá světluška?",
+        "image_suggestion": "Velká laskavá světluška si prohlíží Broučkovo světýlko.",
+        "choices": [
+            {
+                "choice_text": "Použije kouzelný pyl.",
+                "choice_image_suggestion": "Světluška sype na světýlko třpytivý pyl, světýlko svítí.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Vymění jiskřičku.",
+                "choice_image_suggestion": "Světluška dává do světýlka novou jiskřičku.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Naučí Broučka opravu.",
+                "choice_image_suggestion": "Světluška ukazuje Broučkovi, jak opravit světýlko, Brouček to zkouší.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            }
+        ]
+    },
+    "Q5_WET_LANTERN_OPTIONS": {
+        "node_id": "Q5_WET_LANTERN_OPTIONS",
+        "text_prompt": "Brouček má své světýlko zpátky, ale je celé mokré (nebo trochu pomačkané). Co teď?",
+        "image_suggestion": "Brouček drží mokré/pomačkané světýlko.",
+        "choices": [
+            {
+                "choice_text": "Domů za Maminkou.",
+                "choice_image_suggestion": "Brouček běží k domečku, kde čeká Maminka.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING" 
+            },
+            {
+                "choice_text": "Osušit na sluníčku.",
+                "choice_image_suggestion": "Brouček suší světýlko na slunci nebo lístečkem.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Nese ho opatrně.",
+                "choice_image_suggestion": "Brouček opatrně nese světýlko, usmívá se.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING" 
+            }
+        ]
+    },
+     "Q5_LANTERN_FOUND_OPTIONS": {
+        "node_id": "Q5_LANTERN_FOUND_OPTIONS",
+        "text_prompt": "Hurá, světýlko se našlo! Je v pořádku (nebo jen trošku potřebuje oprášit). Co Brouček udělá?",
+        "image_suggestion": "Brouček radostně drží své nalezené světýlko.",
+        "choices": [
+            {
+                "choice_text": "Hned si jde hrát.",
+                "choice_image_suggestion": "Brouček si svítí světýlkem a hraje si.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Poděkuje za pomoc.",
+                "choice_image_suggestion": "Brouček děkuje (Berušce/Komtříčkovi/Rodičům).",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            },
+            {
+                "choice_text": "Opatrně ho schová.",
+                "choice_image_suggestion": "Brouček si dává světýlko do malé kapsičky.",
+                "next_node_id": "END_LANTERN_OK_HAPPY_PLAYING"
+            }
+        ]
+    },
+    "END_LANTERN_OK_HAPPY_PLAYING": {
+      "node_id": "END_LANTERN_OK_HAPPY_PLAYING",
+      "text_prompt": "Světýlko zase krásně svítí! Brouček má ohromnou radost a hned si běží hrát a svítit si na cestu.",
+      "image_suggestion": "Šťastný Brouček si hraje se svým jasně zářícím světýlkem na louce.",
+      "is_ending": true
+    },
+    "END_NEW_LANTERN_HAPPY": {
+      "node_id": "END_NEW_LANTERN_HAPPY",
+      "text_prompt": "Brouček dostal (nebo si vyrobil) úplně nové světýlko! Je tak krásné a svítí ještě jasněji než to staré! Brouček je nadšený.",
+      "image_suggestion": "Brouček pyšně drží své nové, zářící světýlko, usmívá se od ucha k uchu.",
+      "is_ending": true
+    },
+    "END_HOME_SAFE_WITH_FAMILY": {
+      "node_id": "END_HOME_SAFE_WITH_FAMILY",
+      "text_prompt": "Brouček je konečně doma s Maminkou a Tatínkem. I když světýlko třeba nemá, je v bezpečí, v teple a s těmi, které má rád. Dali si spolu dobrou večeři a povídali si.",
+      "image_suggestion": "Brouček sedí u stolu s Maminkou a Tatínkem, v domečku je útulno, na stole dobroty.",
+      "is_ending": true
+    },
+    "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY": {
+      "node_id": "END_FUN_WITH_FRIENDS_LANTERN_SECONDARY",
+      "text_prompt": "Brouček si s kamarády (Beruškou/Komtříčkem/svatojánskými muškami) užil spoustu legrace! Na světýlko skoro zapomněl, jak jim bylo spolu dobře. Někdy je nejlepší zábava s přáteli!",
+      "image_suggestion": "Brouček si hraje a směje se s Beruškou a Komtříčkem (nebo svatojánskými muškami) na louce.",
+      "is_ending": true
+    },
+    "END_ESCAPED_ZLUNA_TO_MOM": {
+      "node_id": "END_ESCAPED_ZLUNA_TO_MOM",
+      "text_prompt": "Brouček celý udýchaný přiletěl k Mamince! Maminka ho objala a Žluna se už neodvážila přiblížit. Brouček je v bezpečí!",
+      "image_suggestion": "Maminka objímá Broučka, v dálce je vidět odlétající Žluna.",
+      "is_ending": true
+    },
+    "END_ESCAPED_ZLUNA_HIDING": {
+      "node_id": "END_ESCAPED_ZLUNA_HIDING",
+      "text_prompt": "Brouček se tiše krčil a čekal. Nakonec to Žluna vzdala a odletěla hledat kořist jinam. Brouček si oddychl, to bylo o vlásek!",
+      "image_suggestion": "Brouček opatrně vykukuje z úkrytu, Žluna nikde.",
+      "is_ending": true
+    },
+     "END_ESCAPED_ZLUNA_WITH_HELP": {
+      "node_id": "END_ESCAPED_ZLUNA_WITH_HELP",
+      "text_prompt": "Naštěstí přiletěli kamarádi (nebo rodiče) a zlou Žlunu společně zahnali! Brouček jim moc poděkoval za záchranu.",
+      "image_suggestion": "Brouček s kamarády/rodiči, kteří odhánějí Žlunu, nebo Žluna odlétá.",
+      "is_ending": true
+    },
+    "END_LANTERN_SCARES_ZLUNA": {
+      "node_id": "END_LANTERN_SCARES_ZLUNA",
+      "text_prompt": "Jak se Brouček bál, jeho světýlko se náhle prudce rozsvítilo! Jasné světlo oslnilo Žlunu tak, že se polekala a rychle odletěla pryč. Světýlko Broučka zachránilo!",
+      "image_suggestion": "Broučkovo světýlko září velmi jasně, Žluna si zakrývá oči a odlétá.",
+      "is_ending": true
+    },
+    "END_HOME_AFTER_SHARED_ACTIVITY_SONG": {
+      "node_id": "END_HOME_AFTER_SHARED_ACTIVITY_SONG",
+      "text_prompt": "Maminka Broučkovi zazpívala jeho oblíbenou písničku a hned mu bylo lépe. Společně se vrátili domů, Brouček si písničku pobrukoval celou cestu.",
+      "image_suggestion": "Maminka a Brouček jdou ruku v ruce domů, kolem nich poletují noty.",
+      "is_ending": true
+    },
+     "END_HOME_AFTER_SHARED_ACTIVITY_STORY": {
+      "node_id": "END_HOME_AFTER_SHARED_ACTIVITY_STORY",
+      "text_prompt": "Tatínek Broučkovi vyprávěl napínavou pohádku. Brouček poslouchal s otevřenou pusou a na všechny starosti zapomněl. Doma se mu pak krásně usínalo.",
+      "image_suggestion": "Tatínek sedí s Broučkem a vypráví mu pohádku (může být vidět kniha).",
+      "is_ending": true
+    },
+    "END_HOME_AFTER_SHARED_ACTIVITY_RAIN": {
+      "node_id": "END_HOME_AFTER_SHARED_ACTIVITY_RAIN",
+      "text_prompt": "Brouček s Beruškou se schovali před deštěm pod velký list. Když přestalo pršet, objevila se na obloze krásná duha! Pak se rozloučili a Brouček běžel domů.",
+      "image_suggestion": "Brouček a Beruška koukají na duhu, v pozadí odcházející déšť.",
+      "is_ending": true
+    },
+    "END_HOME_AFTER_SHARED_ACTIVITY_BORROWED_LIGHT": {
+      "node_id": "END_HOME_AFTER_SHARED_ACTIVITY_BORROWED_LIGHT",
+      "text_prompt": "Komtříček byl tak hodný a půjčil Broučkovi své světýlko na cestu domů. Brouček mu druhý den světýlko vrátil a moc poděkoval. To je opravdový kamarád!",
+      "image_suggestion": "Brouček vrací Komtříčkovi světýlko, oba se usmívají.",
+      "is_ending": true
+    }
+  }
+}

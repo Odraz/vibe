@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Clicker</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="game-container">
+        <header>
+            <h1>Cosmic Clicker</h1>
+            <div id="score-container">
+                <p>Minerals: <span id="score">0</span></p>
+                <p>Per Second: <span id="mps">0</span></p>
+            </div>
+        </header>
+
+        <main>
+            <div id="clicker-zone">
+                <!-- Asteroid image from kenney.nl (CC0) -->
+                <img src="https://i.imgur.com/gTfHqfW.png" alt="Asteroid to mine" id="asteroid">
+            </div>
+        </main>
+
+        <aside id="upgrades-container">
+            <h2>Upgrades</h2>
+            <div id="upgrades-list"></div>
+        </aside>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+body {
+    background-color: #0c0c1e;
+    background-image: url('https://www.transparenttextures.com/patterns/stardust.png');
+    color: #e0e0e0;
+    font-family: 'Orbitron', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    overflow: hidden;
+    user-select: none;
+}
+
+#game-container {
+    display: grid;
+    grid-template-areas:
+        "header header"
+        "main aside";
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    width: 90%;
+    max-width: 1200px;
+    background-color: rgba(20, 20, 40, 0.85);
+    border: 2px solid #4a4a8a;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 0 25px rgba(74, 74, 138, 0.8);
+}
+
+header {
+    grid-area: header;
+    text-align: center;
+    border-bottom: 2px solid #4a4a8a;
+    padding-bottom: 10px;
+}
+
+header h1 {
+    margin: 0;
+    color: #ff9800;
+    text-shadow: 0 0 10px #ff9800;
+    letter-spacing: 2px;
+}
+
+#score-container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    font-size: 1.2em;
+    margin-top: 10px;
+}
+
+main {
+    grid-area: main;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#clicker-zone {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#asteroid {
+    width: 280px;
+    cursor: pointer;
+    transition: transform 0.1s ease-in-out;
+    filter: drop-shadow(0 0 15px #222);
+}
+
+#asteroid:active {
+    transform: scale(0.95);
+}
+
+.floating-text {
+    position: absolute;
+    color: #ffc107;
+    font-size: 1.8em;
+    font-weight: bold;
+    pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+    text-shadow: 0 0 5px #000;
+}
+
+@keyframes floatUp {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-60px);
+    }
+}
+
+#upgrades-container {
+    grid-area: aside;
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #4a4a8a;
+    height: 60vh;
+    overflow-y: auto;
+}
+
+#upgrades-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.upgrade {
+    background-color: #333355;
+    border: 1px solid #666699;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.upgrade.disabled {
+    background-color: #2a2a3a;
+    border-color: #4a4a5a;
+    color: #888;
+    cursor: not-allowed;
+}
+
+.upgrade.disabled h3, .upgrade.disabled .cost {
+    color: #888;
+}
+
+.upgrade:not(.disabled):hover {
+    background-color: #444466;
+    border-color: #8888bb;
+}
+
+.upgrade h3 {
+    margin: 0 0 5px 0;
+    color: #ffc107;
+    font-size: 1em;
+}
+
+.upgrade-cost {
+    font-weight: bold;
+    color: #76ff03;
+}
